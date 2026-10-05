@@ -1,0 +1,72 @@
+import { NextResponse } from "next/server";
+import { getDb, getSessionUser } from "../../../lib/db";
+import { embedText, toVectorLiteral } from "../../../lib/embeddings";
+import { generateGroundedAnswer } from "../../../lib/llm";
+
+const TOP_K = 6;
+
+export async function POST(request) {
+  const user = await getSessionUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
+  const { repositoryId, question } = await request.json();
+  if (!repositoryId || !question) {
+    return NextResponse.json({ error: "repositoryId and question are required" }, { status: 400 });
+  }
+
+  const db = getDb();
+
+  // Any signed-in teammate can query any repo the team has indexed — this is
+  // a shared workspace, not a per-user private one. We still require login
+  // (checked above) so it's not open to the public internet, and we still
+  // confirm the repo exists so a bad/old id gives a clean error.
+  const { rows: repoRows } = await db.query(`SELECT id FROM repositories WHERE id = $1`, [
+    repositoryId,
+  ]);
+  if (repoRows.length === 0) {
+    return NextResponse.json({ error: "Repository not found" }, { status: 404 });
+  }
+
+  try {
+    const questionEmbedding = await embedText(question);
+
+    // pgvector's <=> operator is cosine distance; smaller is more similar.
+    const { rows: chunkRows } = await db.query(
+      `SELECT file_path, start_line, end_line, content
+       FROM chunks
+       WHERE repository_id = $1
+       ORDER BY embedding <=> $2
+       LIMIT $3`,
+      [repositoryId, toVectorLiteral(questionEmbedding), TOP_K]
+    );
+
+    const chunks = chunkRows.map((r) => ({
+      filePath: r.file_path,
+      startLine: r.start_line,
+      endLine: r.end_line,
+      content: r.content,
+    }));
+
+    const { answer, sources } = await generateGroundedAnswer(question, chunks);
+
+    // Persist so this survives a refresh / repo switch. Best-effort and
+    // isolated in its own try/catch — a DB hiccup here shouldn't take down
+    // an otherwise-successful answer the user is waiting on.
+    try {
+      await db.query(
+        `INSERT INTO qa_history (repository_id, user_id, question, answer, sources)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [repositoryId, user.id, question, answer, sources]
+      );
+    } catch (err) {
+      console.error("Failed to save chat history (answer still returned):", err);
+    }
+
+    return NextResponse.json({ answer, sources });
+  } catch (err) {
+    console.error("Chat failed:", err);
+    return NextResponse.json({ error: err.message || "Chat failed" }, { status: 500 });
+  }
+}

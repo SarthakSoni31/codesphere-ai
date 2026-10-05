@@ -1,0 +1,17 @@
+[
+  { "question": "Where is authentication handled?", "expectedFile": "middleware/auth.js" },
+  { "question": "How does GitHub OAuth login work in this app?", "expectedFile": "middleware/auth.js" },
+  { "question": "How are new grievances automatically classified into categories?", "expectedFile": "helpers/classifier.js" },
+  { "question": "How is urgency determined for a grievance?", "expectedFile": "helpers/classifier.js" },
+  { "question": "How are grievances mapped to a department?", "expectedFile": "helpers/classifier.js" },
+  { "question": "What fields does the grievance model have?", "expectedFile": "models/grievance.js" },
+  { "question": "What fields are on the admin user model?", "expectedFile": "models/admin.js" },
+  { "question": "What fields are on the citizen model?", "expectedFile": "models/citizen.js" },
+  { "question": "What does the department model look like?", "expectedFile": "models/department.js" },
+  { "question": "What does the adhikari (official) model contain?", "expectedFile": "models/adhikari.js" },
+  { "question": "How does an official's dashboard calculate assigned grievance counts?", "expectedFile": "src/routes/adhikari.js" },
+  { "question": "How does the admin dashboard aggregate statistics?", "expectedFile": "src/routes/admin.js" },
+  { "question": "How does pagination work on the grievance listing page?", "expectedFile": "src/routes/admin.js" },
+  { "question": "Where can a citizen file a new grievance?", "expectedFile": "src/routes/citizen.js" },
+  { "question": "What does a citizen's dashboard show them?", "expectedFile": "src/routes/citizen.js" }
+]
