@@ -4,8 +4,8 @@ import NotificationBell from "./components/NotificationBell";
 import "./globals.css";
 
 export const metadata = {
-  title: "CodeSphere AI",
-  description: "Ask questions about your codebase. Auto-triage new issues.",
+  title: "CodeSphere — Codebase Intelligence & Auto-Triage",
+  description: "Grounded codebase question answering, issue triage, and module ownership for engineering teams.",
 };
 
 export default function RootLayout({ children }) {
@@ -14,46 +14,37 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <header
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "0.85rem 1.5rem",
-            borderBottom: "1px solid var(--border)",
-            boxShadow: "0 2px 16px rgba(0,0,0,0.25)",
-            background: "var(--surface)",
-          }}
-        >
-          <a
-            href="/"
-            style={{
-              textDecoration: "none",
-              fontFamily: "var(--font-display)",
-              fontWeight: 700,
-              fontSize: "1.05rem",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <span
-              style={{
-                display: "inline-block",
-                width: 8,
-                height: 8,
-                borderRadius: 2,
-                background: "var(--accent)",
-              }}
-            />
-            CodeSphere AI
+        <header className="app-header">
+          <a href="/" className="brand-logo-link">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="brand-logo-svg"
+            >
+              <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeOpacity="0.3" strokeWidth="1.2" />
+              <ellipse cx="12" cy="12" rx="4.5" ry="9.5" stroke="currentColor" strokeOpacity="0.25" strokeWidth="1" strokeDasharray="2 2" />
+              <path d="M8 9.5L5.5 12L8 14.5" stroke="var(--accent)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M16 9.5L18.5 12L16 14.5" stroke="var(--accent)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M13 7.5L11 16.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+            <span className="brand-name">CodeSphere</span>
           </a>
-          {isSignedIn && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <NotificationBell />
-              <SignOutButton />
-            </div>
-          )}
+
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {isSignedIn ? (
+              <>
+                <NotificationBell />
+                <SignOutButton />
+              </>
+            ) : (
+              <a href="/api/auth/github" className="btn btn-secondary header-login-btn">
+                Sign in with GitHub
+              </a>
+            )}
+          </div>
         </header>
         {children}
       </body>

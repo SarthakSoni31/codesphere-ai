@@ -127,9 +127,12 @@ export default function DashboardApp() {
                   deleteRepo(r);
                 }}
                 title="Delete repository"
-                style={{ background: "none", border: "none", color: "var(--muted-2)", cursor: "pointer", fontSize: "0.85rem", flexShrink: 0, padding: "2px 4px" }}
+                style={{ background: "none", border: "none", color: "var(--muted-2)", cursor: "pointer", display: "inline-flex", alignItems: "center", flexShrink: 0, padding: "2px 4px" }}
               >
-                🗑️
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
               </button>
             )}
           </div>
@@ -142,29 +145,29 @@ export default function DashboardApp() {
               onClick={() => setSelectedRepo(null)}
               style={{ marginTop: 12 }}
             >
-              ← Workspace Overview
+              &larr; Workspace Overview
             </button>
             <p className="sidebar-heading" style={{ marginTop: "0.8rem" }}>{selectedRepo.name}</p>
             <button className={`nav-tab ${view === "chat" ? "active" : ""}`} onClick={() => setView("chat")}>
-              💬 Ask the code
+              Code Assistant
             </button>
             <button className={`nav-tab ${view === "dashboard" ? "active" : ""}`} onClick={() => setView("dashboard")}>
-              📊 Dashboard &amp; Health
+              Backlog &amp; Health
             </button>
             <button className={`nav-tab ${view === "team" ? "active" : ""}`} onClick={() => setView("team")}>
-              👥 Contributors
+              Contributors
             </button>
             <button
               className={`nav-tab ${view === "discussion" ? "active" : ""}`}
               onClick={() => setView("discussion")}
             >
-              💭 Team Discussion
+              Discussion
             </button>
             <button
               className={`nav-tab ${view === "assignments" ? "active" : ""}`}
               onClick={() => setView("assignments")}
             >
-              📋 Module Assignments
+              Assignments
             </button>
           </>
         )}
@@ -229,124 +232,66 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew }) {
 
   return (
     <div className="dashboard-hub">
-      {/* Header Banner */}
+      {/* Header */}
       <div className="hub-welcome-banner">
         <div>
-          <span className="hero-eyebrow">Enterprise Workspace Control</span>
-          <h1 style={{ fontSize: "1.85rem", marginBottom: 4, marginTop: 4 }}>
-            {currentUser ? `Welcome back, @${currentUser.login}` : "Welcome to CodeSphere AI"}
+          <span className="hero-eyebrow">WORKSPACE</span>
+          <h1 style={{ fontSize: "1.7rem", marginBottom: 4, marginTop: 4 }}>
+            {currentUser ? `@${currentUser.login}` : "Workspace Overview"}
           </h1>
-          <p style={{ color: "var(--muted)", fontSize: "0.9rem", margin: 0 }}>
-            Unified intelligence hub for your connected GitHub repositories, tasks, and auto-triage workflows.
+          <p style={{ color: "var(--muted)", fontSize: "0.88rem", margin: 0 }}>
+            Connected repositories and assigned tasks across your team.
           </p>
         </div>
         <button className="btn btn-primary" onClick={onConnectNew} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span>+ Connect Repository</span>
+          <span>+ Connect repository</span>
         </button>
       </div>
 
-      {/* Stats Row */}
-      <div className="hub-stats-grid">
-        <div className="hub-stat-card">
-          <div className="hub-stat-num">{teamRepos.length}</div>
-          <div className="hub-stat-title">Connected Repos</div>
-          <div className="hub-stat-sub">Shared with team</div>
+      {/* Summary Metrics Strip */}
+      <div className="hub-summary-strip">
+        <div className="summary-item">
+          <span className="summary-val">{teamRepos.length}</span>
+          <span className="summary-lbl">Repositories</span>
         </div>
-        <div className="hub-stat-card">
-          <div className="hub-stat-num">{totalChunks.toLocaleString()}</div>
-          <div className="hub-stat-title">Indexed Chunks</div>
-          <div className="hub-stat-sub">pgvector 384-dim vectors</div>
+        <div className="summary-sep" />
+        <div className="summary-item">
+          <span className="summary-val">{totalChunks.toLocaleString()}</span>
+          <span className="summary-lbl">Vector Chunks</span>
         </div>
-        <div className="hub-stat-card">
-          <div className="hub-stat-num">{assignments.length}</div>
-          <div className="hub-stat-title">Assigned Tasks</div>
-          <div className="hub-stat-sub">{overdue.length} overdue • {upcoming.length} active</div>
+        <div className="summary-sep" />
+        <div className="summary-item">
+          <span className="summary-val">{assignments.length}</span>
+          <span className="summary-lbl">Assigned Tasks ({overdue.length} overdue)</span>
         </div>
-        <div className="hub-stat-card">
-          <div className="hub-stat-num" style={{ color: "var(--success)" }}>86.7%</div>
-          <div className="hub-stat-title">Grounding Score</div>
-          <div className="hub-stat-sub">Zero-hallucination accuracy</div>
-        </div>
-      </div>
-
-      {/* Feature Capabilities Launchpad */}
-      <div style={{ marginBottom: "2.5rem" }}>
-        <h3 className="hub-section-title">
-          <span>⚡</span> Quick Capabilities Launchpad
-        </h3>
-        <div className="hub-launchpad-grid">
-          <div
-            className="hub-launch-card"
-            onClick={() => {
-              if (teamRepos.length > 0) onOpenRepo(teamRepos[0].id, "chat");
-              else onConnectNew();
-            }}
-          >
-            <div className="hub-launch-icon">🔍</div>
-            <h4>Grounded AI Chat</h4>
-            <p>Query codebase architecture, find file responsibilities, and get precise line citations.</p>
-          </div>
-
-          <div
-            className="hub-launch-card"
-            onClick={() => {
-              if (teamRepos.length > 0) onOpenRepo(teamRepos[0].id, "dashboard");
-              else onConnectNew();
-            }}
-          >
-            <div className="hub-launch-icon">🛡️</div>
-            <h4>Automated Bug Audit</h4>
-            <p>Scan AST chunks for logic errors, unhandled promise rejections, and security hazards.</p>
-          </div>
-
-          <div
-            className="hub-launch-card"
-            onClick={() => {
-              if (teamRepos.length > 0) onOpenRepo(teamRepos[0].id, "dashboard");
-              else onConnectNew();
-            }}
-          >
-            <div className="hub-launch-icon">🤖</div>
-            <h4>Auto-Triage Webhook</h4>
-            <p>Listen for GitHub issue events, generate summaries, predict tags, and post code pointers.</p>
-          </div>
-
-          <div
-            className="hub-launch-card"
-            onClick={() => {
-              if (teamRepos.length > 0) onOpenRepo(teamRepos[0].id, "assignments");
-              else onConnectNew();
-            }}
-          >
-            <div className="hub-launch-icon">👥</div>
-            <h4>Team Task Delegation</h4>
-            <p>Assign specific files and modules to contributors with notes, deadlines, and receipts.</p>
-          </div>
+        <div className="summary-sep" />
+        <div className="summary-item">
+          <span className="summary-val" style={{ color: "var(--success)" }}>86.7%</span>
+          <span className="summary-lbl">Grounding Rate</span>
         </div>
       </div>
 
-      {/* Connected Repositories Grid */}
+      {/* Connected Repositories Section */}
       <div style={{ marginBottom: "2.5rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.9rem" }}>
           <h3 className="hub-section-title" style={{ margin: 0 }}>
-            <span>📁</span> Connected Repositories ({teamRepos.length})
+            Connected Repositories ({teamRepos.length})
           </h3>
           {teamRepos.length > 0 && (
-            <button className="btn" style={{ fontSize: "0.78rem", padding: "0.3rem 0.7rem" }} onClick={onConnectNew}>
-              + Add Another
+            <button className="btn" style={{ fontSize: "0.78rem", padding: "0.3rem 0.65rem" }} onClick={onConnectNew}>
+              + Add repository
             </button>
           )}
         </div>
 
         {teamRepos.length === 0 ? (
-          <div className="card" style={{ padding: "2rem", textAlign: "center", maxWidth: 600, margin: "0 auto" }}>
-            <div style={{ fontSize: "2rem", marginBottom: 8 }}>🚀</div>
-            <h4 style={{ margin: "0 0 8px", fontSize: "1.1rem" }}>No repositories connected yet</h4>
-            <p style={{ color: "var(--muted)", fontSize: "0.88rem", marginBottom: "1.25rem" }}>
-              Connect your first GitHub repository to start indexing code, asking questions, and enabling AI triage.
+          <div className="card" style={{ padding: "2.5rem 1.5rem", textAlign: "center", maxWidth: 540, margin: "0 auto" }}>
+            <h4 style={{ margin: "0 0 6px", fontSize: "1.05rem" }}>No repositories connected yet</h4>
+            <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginBottom: "1.2rem", lineHeight: 1.5 }}>
+              Connect a GitHub repository to begin indexing source files, asking grounded questions, and automating issue triage.
             </p>
             <button className="btn btn-primary" onClick={onConnectNew}>
-              Connect Your First Repository →
+              Connect repository &rarr;
             </button>
           </div>
         ) : (
@@ -368,22 +313,22 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew }) {
                     </div>
                   </div>
                   <div className="hub-repo-meta">
-                    📦 {r.chunkCount} vector chunks • Connected by @{r.indexedBy || "you"}
+                    {r.chunkCount} chunks indexed &bull; Connected by @{r.indexedBy || "team"}
                   </div>
                 </div>
 
                 <div className="hub-repo-actions">
                   <button className="hub-repo-btn primary" onClick={() => onOpenRepo(r.id, "chat")}>
-                    💬 Ask Code
+                    Code Assistant
                   </button>
                   <button className="hub-repo-btn" onClick={() => onOpenRepo(r.id, "dashboard")}>
-                    📊 Dashboard
+                    Backlog &amp; Health
                   </button>
                   <button className="hub-repo-btn" onClick={() => onOpenRepo(r.id, "assignments")}>
-                    📋 Tasks
+                    Assignments
                   </button>
                   <button className="hub-repo-btn" onClick={() => onOpenRepo(r.id, "discussion")}>
-                    💭 Chat
+                    Discussion
                   </button>
                 </div>
               </div>
@@ -395,15 +340,15 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew }) {
       {/* Task & Assignment Section */}
       <div>
         <h3 className="hub-section-title">
-          <span>📋</span> My Assigned Tasks
+          Assigned Tasks
         </h3>
 
-        {loading && <p className="empty-state">Loading assigned tasks...</p>}
+        {loading && <p className="empty-state">Loading tasks...</p>}
 
         {!loading && assignments.length === 0 && (
-          <div className="card" style={{ maxWidth: 540 }}>
-            <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.88rem" }}>
-              🎉 You have no pending tasks! You are all caught up across all connected team repositories.
+          <div className="card" style={{ maxWidth: 520 }}>
+            <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.85rem" }}>
+              No tasks currently assigned to your account.
             </p>
           </div>
         )}
@@ -411,7 +356,7 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew }) {
         {overdue.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <p className="sidebar-heading" style={{ padding: 0, color: "var(--danger)", marginBottom: 8 }}>
-              ⚠️ Overdue Tasks ({overdue.length})
+              Overdue ({overdue.length})
             </p>
             <TaskList tasks={overdue} onMarkRead={markRead} onOpenRepo={onOpenRepo} />
           </div>
@@ -420,7 +365,7 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew }) {
         {upcoming.length > 0 && (
           <div>
             <p className="sidebar-heading" style={{ padding: 0, marginBottom: 8 }}>
-              Active Tasks ({upcoming.length})
+              Active ({upcoming.length})
             </p>
             <TaskList tasks={upcoming} onMarkRead={markRead} onOpenRepo={onOpenRepo} />
           </div>
