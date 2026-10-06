@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDb, getSessionUser } from "../../../lib/db";
-import { embedText, toVectorLiteral } from "../../../lib/embeddings";
+import { findRelevantChunks } from "../../../lib/retrieval";
 import { generateGroundedAnswer } from "../../../lib/llm";
 
-const TOP_K = 5;
+const TOP_K = 6;
 
 // Same idea as the webhook bot's "Where to look" section, but callable
 // on-demand from the website — covers issues opened before the webhook was
@@ -26,24 +26,15 @@ export async function POST(request) {
   }
 
   try {
-    const question = `A user reported this bug:\n"${title}"\n${issueBody || ""}\n\nWhich files in the codebase are most likely responsible, and what should someone check first?`;
-    const questionEmbedding = await embedText(question);
+    const question = `A user reported this bug/issue:\nTitle: "${title}"\n${issueBody ? `Description:\n${issueBody}\n` : ""}\nWhich files in the codebase are responsible for this, and what specifically should someone inspect or fix?`;
 
-    const { rows: chunkRows } = await db.query(
-      `SELECT file_path, start_line, end_line, content
-       FROM chunks
-       WHERE repository_id = $1
-       ORDER BY embedding <=> $2
-       LIMIT $3`,
-      [repositoryId, toVectorLiteral(questionEmbedding), TOP_K]
-    );
-
-    const chunks = chunkRows.map((r) => ({
-      filePath: r.file_path,
-      startLine: r.start_line,
-      endLine: r.end_line,
-      content: r.content,
-    }));
+    const chunks = await findRelevantChunks(db, {
+      repositoryId,
+      query: question,
+      contextText: `${title} ${issueBody || ""}`,
+      limit: TOP_K,
+      isCodeQuestion: true,
+    });
 
     const { answer, sources } = await generateGroundedAnswer(question, chunks);
     return NextResponse.json({ answer, sources });

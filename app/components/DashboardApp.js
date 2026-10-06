@@ -644,7 +644,8 @@ function ChatView({ repo }) {
               <ReactMarkdown>{turn.answer}</ReactMarkdown>
             </div>
             {turn.sources?.length > 0 && (
-              <div style={{ marginTop: 8 }}>
+              <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--muted)", marginRight: 2 }}>Sources cited:</span>
                 {turn.sources.map((s) => (
                   <span key={s} className="source-chip mono">
                     {s}
@@ -906,7 +907,8 @@ function StaleIssueRow({ issue, repo }) {
                 <ReactMarkdown>{help.answer}</ReactMarkdown>
               </div>
               {help.sources?.length > 0 && (
-                <div style={{ marginTop: 6 }}>
+                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: "0.72rem", color: "var(--muted)", marginRight: 2 }}>Sources cited:</span>
                   {help.sources.map((s) => (
                     <span key={s} className="source-chip mono">
                       {s}

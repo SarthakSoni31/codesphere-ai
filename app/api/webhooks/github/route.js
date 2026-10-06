@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "../../../../lib/db";
 import { verifyWebhookSignature, postIssueComment, addIssueLabel } from "../../../../lib/github";
 import { generateIssueSummary, generateGroundedAnswer } from "../../../../lib/llm";
-import { embedText, toVectorLiteral } from "../../../../lib/embeddings";
+import { findRelevantChunks } from "../../../../lib/retrieval";
 
 // Configure this in each repo's Settings -> Webhooks:
 //   Payload URL: {NEXT_PUBLIC_APP_URL}/api/webhooks/github
@@ -53,25 +53,21 @@ export async function POST(request) {
     // question, grounded in this repo's already-indexed source.
     let codePointer = "";
     try {
-      const diagnosticQuestion = `A user reported this bug:\n"${issue.title}"\n${issue.body || ""}\n\nWhich files in the codebase are most likely responsible, and what should someone check first?`;
-      const questionEmbedding = await embedText(diagnosticQuestion);
-      const { rows: chunkRows } = await db.query(
-        `SELECT file_path, start_line, end_line, content
-         FROM chunks
-         WHERE repository_id = $1
-         ORDER BY embedding <=> $2
-         LIMIT 5`,
-        [repositoryId, toVectorLiteral(questionEmbedding)]
-      );
-      if (chunkRows.length > 0) {
-        const chunks = chunkRows.map((r) => ({
-          filePath: r.file_path,
-          startLine: r.start_line,
-          endLine: r.end_line,
-          content: r.content,
-        }));
-        const { answer } = await generateGroundedAnswer(diagnosticQuestion, chunks);
-        codePointer = `\n\n**Where to look:** ${answer}`;
+      const diagnosticQuestion = `A user reported this bug/issue:\nTitle: "${issue.title}"\n${issue.body ? `Description:\n${issue.body}\n` : ""}\nWhich files in the codebase are responsible for this, and what specifically should someone inspect or fix?`;
+      const chunks = await findRelevantChunks(db, {
+        repositoryId,
+        query: diagnosticQuestion,
+        contextText: `${issue.title} ${issue.body || ""}`,
+        limit: 5,
+        isCodeQuestion: true,
+      });
+
+      if (chunks.length > 0) {
+        const { answer, sources } = await generateGroundedAnswer(diagnosticQuestion, chunks);
+        // Only append codePointer if the model actually cited grounded sources
+        if (sources.length > 0) {
+          codePointer = `\n\n**Where to look:** ${answer}`;
+        }
       }
     } catch (err) {
       // Non-fatal: if retrieval fails for any reason, still post the

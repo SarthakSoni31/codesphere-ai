@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb, getSessionUser } from "../../../lib/db";
-import { embedText, toVectorLiteral } from "../../../lib/embeddings";
+import { findRelevantChunks } from "../../../lib/retrieval";
 import { generateGroundedAnswer } from "../../../lib/llm";
 
 const TOP_K = 6;
@@ -30,24 +30,13 @@ export async function POST(request) {
   }
 
   try {
-    const questionEmbedding = await embedText(question);
-
-    // pgvector's <=> operator is cosine distance; smaller is more similar.
-    const { rows: chunkRows } = await db.query(
-      `SELECT file_path, start_line, end_line, content
-       FROM chunks
-       WHERE repository_id = $1
-       ORDER BY embedding <=> $2
-       LIMIT $3`,
-      [repositoryId, toVectorLiteral(questionEmbedding), TOP_K]
-    );
-
-    const chunks = chunkRows.map((r) => ({
-      filePath: r.file_path,
-      startLine: r.start_line,
-      endLine: r.end_line,
-      content: r.content,
-    }));
+    const chunks = await findRelevantChunks(db, {
+      repositoryId,
+      query: question,
+      contextText: question,
+      limit: TOP_K,
+      isCodeQuestion: true,
+    });
 
     const { answer, sources } = await generateGroundedAnswer(question, chunks);
 
