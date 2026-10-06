@@ -858,6 +858,12 @@ function StaleIssueRow({ issue, repo }) {
   const [help, setHelp] = useState(null); // { answer, sources }
   const [error, setError] = useState("");
 
+  const [solutionText, setSolutionText] = useState("");
+  const [generatingSolution, setGeneratingSolution] = useState(false);
+  const [postingComment, setPostingComment] = useState(false);
+  const [postSuccess, setPostSuccess] = useState(null);
+  const [postError, setPostError] = useState("");
+
   async function getHelp() {
     setOpen(true);
     if (help) return; // already fetched, just toggling open
@@ -876,6 +882,62 @@ function StaleIssueRow({ issue, repo }) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function generateSolution() {
+    setGeneratingSolution(true);
+    setPostError("");
+    setPostSuccess(null);
+    try {
+      const res = await fetch("/api/generate-solution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repositoryId: repo.id,
+          title: issue.title,
+          issueBody: issue.body,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSolutionText(data.solution);
+      } else {
+        setPostError(data.error || "Failed to generate solution");
+      }
+    } catch (err) {
+      setPostError(err.message);
+    } finally {
+      setGeneratingSolution(false);
+    }
+  }
+
+  async function postSolution() {
+    if (!solutionText.trim()) return;
+    setPostingComment(true);
+    setPostError("");
+    setPostSuccess(null);
+    try {
+      const res = await fetch("/api/post-issue-solution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          owner: repo.owner,
+          repo: repo.name,
+          issueNumber: issue.number,
+          comment: solutionText,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPostSuccess({ url: data.url });
+      } else {
+        setPostError(data.error || "Failed to post solution to GitHub");
+      }
+    } catch (err) {
+      setPostError(err.message);
+    } finally {
+      setPostingComment(false);
     }
   }
 
@@ -916,6 +978,92 @@ function StaleIssueRow({ issue, repo }) {
                   ))}
                 </div>
               )}
+
+              {/* Solution Formulation & Direct GitHub Push */}
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>Proposed Fix &amp; Solution</span>
+                  {!solutionText && !generatingSolution && (
+                    <button
+                      className="btn btn-primary"
+                      style={{ fontSize: "0.74rem", padding: "0.25rem 0.65rem" }}
+                      onClick={generateSolution}
+                    >
+                      Draft Code Solution
+                    </button>
+                  )}
+                </div>
+
+                {generatingSolution && (
+                  <p className="empty-state" style={{ padding: "0.4rem 0" }}>
+                    Formulating grounded code fix and verification steps...
+                  </p>
+                )}
+
+                {solutionText && (
+                  <div>
+                    <p style={{ fontSize: "0.75rem", color: "var(--muted)", margin: "0 0 6px" }}>
+                      Review or edit the fix below before pushing it directly to Issue #{issue.number} on GitHub:
+                    </p>
+                    <textarea
+                      className="input"
+                      style={{
+                        width: "100%",
+                        minHeight: 180,
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "0.78rem",
+                        lineHeight: 1.55,
+                        padding: "0.6rem 0.75rem",
+                        resize: "vertical",
+                        background: "var(--surface)",
+                        boxSizing: "border-box",
+                      }}
+                      value={solutionText}
+                      onChange={(e) => setSolutionText(e.target.value)}
+                    />
+
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, flexWrap: "wrap", gap: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <button
+                          className="btn btn-primary"
+                          style={{ fontSize: "0.76rem", padding: "0.35rem 0.75rem" }}
+                          onClick={postSolution}
+                          disabled={postingComment || !solutionText.trim()}
+                        >
+                          {postingComment ? "Posting to GitHub..." : `Push Solution to Issue #${issue.number}`}
+                        </button>
+                        <button
+                          className="btn"
+                          style={{ fontSize: "0.74rem", padding: "0.35rem 0.6rem" }}
+                          onClick={generateSolution}
+                          disabled={generatingSolution}
+                        >
+                          Re-generate
+                        </button>
+                      </div>
+
+                      {postSuccess && (
+                        <span style={{ fontSize: "0.78rem", color: "var(--success)" }}>
+                          ✓ Solution posted to Issue #{issue.number} —{" "}
+                          <a
+                            href={postSuccess.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: "var(--success)", textDecoration: "underline" }}
+                          >
+                            View on GitHub &rarr;
+                          </a>
+                        </span>
+                      )}
+                      {postError && (
+                        <span style={{ fontSize: "0.78rem", color: "var(--danger)" }}>
+                          {postError}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
