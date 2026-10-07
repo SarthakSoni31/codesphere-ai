@@ -8,6 +8,7 @@ import {
   createOrUpdateFile,
   createPullRequest,
 } from "../../../lib/github";
+import { recordDeliveredSolution } from "../../../lib/solutions";
 
 export async function POST(request) {
   const user = await getSessionUser(request);
@@ -97,6 +98,19 @@ export async function POST(request) {
       headRef,
       defaultBranch
     );
+
+    // Record delivery in database
+    await recordDeliveredSolution(db, {
+      owner,
+      repo,
+      issueNumber,
+      deliveryType: "pr",
+      prNumber: pr.number,
+      prUrl: pr.html_url,
+      branch: branchName,
+      solutionText: body,
+      userId: user.id,
+    }).catch((e) => console.warn("Failed to record delivered PR:", e.message));
 
     return NextResponse.json({
       ok: true,

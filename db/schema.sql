@@ -114,3 +114,21 @@ create table if not exists qa_history (
   created_at     timestamptz not null default now()
 );
 create index if not exists qa_history_repo_user_idx on qa_history (repository_id, user_id);
+
+-- Delivered solutions and pull requests for both existing and AI-generated issues.
+create table if not exists delivered_solutions (
+  id              serial primary key,
+  repository_id   integer not null references repositories(id) on delete cascade,
+  issue_number    integer not null,
+  delivery_type   text not null, -- 'comment' | 'pr'
+  pr_number       integer,
+  pr_url          text,
+  comment_url     text,
+  branch          text,
+  solution_text   text,
+  user_id         integer references users(id) on delete set null,
+  created_at      timestamptz not null default now(),
+  unique (repository_id, issue_number, delivery_type)
+);
+create index if not exists delivered_solutions_repo_idx on delivered_solutions (repository_id);
+

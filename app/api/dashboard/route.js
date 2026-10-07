@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "../../../lib/db";
+import { getDb, getSessionUser } from "../../../lib/db";
 import { getIssues, getRecentCommits, getCommitFiles } from "../../../lib/github";
+import { getDeliveredSolutions } from "../../../lib/solutions";
 
 const STALE_DAYS = 14;
 const COMMIT_LOOKBACK_DAYS = 30;
@@ -29,6 +30,14 @@ export async function GET(request) {
       .filter((i) => now - new Date(i.updated_at).getTime() > staleMs)
       .map((i) => ({ number: i.number, title: i.title, updatedAt: i.updated_at, body: i.body || "" }))
       .sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+
+    const allOpenIssues = issues
+      .map((i) => ({ number: i.number, title: i.title, updatedAt: i.updated_at, body: i.body || "" }))
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    // Fetch delivered solutions (PRs and comments) recorded in CodeSphere
+    const db = getDb();
+    const deliveredSolutions = await getDeliveredSolutions(db, owner, repo);
 
     // Module ownership: look at recent commits, attribute each top-level
     // directory to whoever has touched it most in the lookback window.
@@ -62,6 +71,8 @@ export async function GET(request) {
     return NextResponse.json({
       backlogHealth: { openCount: issues.length, staleCount: staleIssues.length },
       staleIssues,
+      allOpenIssues,
+      deliveredSolutions,
       moduleOwnership,
     });
   } catch (err) {

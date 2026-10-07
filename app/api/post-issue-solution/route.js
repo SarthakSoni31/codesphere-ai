@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "../../../lib/db";
+import { getDb, getSessionUser } from "../../../lib/db";
 import { postIssueComment } from "../../../lib/github";
+import { recordDeliveredSolution } from "../../../lib/solutions";
 
 export async function POST(request) {
   const user = await getSessionUser(request);
@@ -25,6 +26,18 @@ export async function POST(request) {
       issueNumber,
       commentBody
     );
+
+    // Record delivery in database
+    const db = getDb();
+    await recordDeliveredSolution(db, {
+      owner,
+      repo,
+      issueNumber,
+      deliveryType: "comment",
+      commentUrl: result.html_url,
+      solutionText: comment,
+      userId: user.id,
+    }).catch((e) => console.warn("Failed to record delivered solution:", e.message));
 
     return NextResponse.json({
       ok: true,

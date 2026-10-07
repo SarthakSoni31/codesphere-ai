@@ -664,6 +664,8 @@ function DashboardView({ repo }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [deliveredSolutions, setDeliveredSolutions] = useState({});
+  const [issueTab, setIssueTab] = useState("stale"); // "stale" | "all"
 
   async function load() {
     setLoading(true);
@@ -671,8 +673,12 @@ function DashboardView({ repo }) {
     try {
       const res = await fetch(`/api/dashboard?owner=${encodeURIComponent(repo.owner)}&repo=${encodeURIComponent(repo.name)}`);
       const json = await res.json();
-      if (res.ok) setData(json);
-      else setError(json.error || "Failed to load dashboard");
+      if (res.ok) {
+        setData(json);
+        setDeliveredSolutions(json.deliveredSolutions || {});
+      } else {
+        setError(json.error || "Failed to load dashboard");
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -680,10 +686,47 @@ function DashboardView({ repo }) {
     }
   }
 
+  function handleSolutionDelivered(issueNumber, type, details) {
+    setDeliveredSolutions((prev) => {
+      const existing = prev[issueNumber] || { comment: null, pr: null };
+      if (type === "pr") {
+        return {
+          ...prev,
+          [issueNumber]: {
+            ...existing,
+            pr: {
+              number: details.number,
+              url: details.url,
+              branch: details.branch,
+              createdAt: new Date().toISOString(),
+            },
+          },
+        };
+      } else if (type === "comment") {
+        return {
+          ...prev,
+          [issueNumber]: {
+            ...existing,
+            comment: {
+              url: details.url,
+              createdAt: new Date().toISOString(),
+            },
+          },
+        };
+      }
+      return prev;
+    });
+  }
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repo.id]);
+
+  const displayedIssues =
+    data && (issueTab === "all" ? (data.allOpenIssues || data.staleIssues) : data.staleIssues);
+  const deliveredCount =
+    displayedIssues ? displayedIssues.filter((i) => deliveredSolutions[i.number]?.pr || deliveredSolutions[i.number]?.comment).length : 0;
 
   return (
     <div>
@@ -696,16 +739,64 @@ function DashboardView({ repo }) {
       {error && <p style={{ color: "var(--danger)", marginTop: 12 }}>{error}</p>}
       {data && (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="card" style={{ display: "flex", gap: 32 }}>
+          <div className="card" style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
             <Stat label="Open issues" value={data.backlogHealth.openCount} />
             <Stat label="Stale (14+ days)" value={data.backlogHealth.staleCount} />
+            <Stat
+              label="Solutions delivered"
+              value={`${Object.values(deliveredSolutions).filter((d) => d.pr || d.comment).length} issues`}
+            />
           </div>
 
           <div className="card">
-            <h3 style={{ marginTop: 0, fontSize: "0.95rem" }}>Stale issues</h3>
-            {data.staleIssues.length === 0 && <p className="empty-state">Nothing stale right now.</p>}
-            {data.staleIssues.map((i) => (
-              <StaleIssueRow key={i.number} issue={i} repo={repo} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Issue resolution</h3>
+                <div style={{ display: "flex", gap: 4, background: "var(--surface)", borderRadius: 6, padding: 2, border: "1px solid var(--border)" }}>
+                  <button
+                    className="btn"
+                    style={{
+                      fontSize: "0.72rem",
+                      padding: "0.2rem 0.6rem",
+                      background: issueTab === "stale" ? "var(--surface-raised)" : "transparent",
+                      border: "none",
+                      color: issueTab === "stale" ? "var(--text)" : "var(--muted)",
+                      fontWeight: issueTab === "stale" ? 600 : 400,
+                    }}
+                    onClick={() => setIssueTab("stale")}
+                  >
+                    Stale ({data.staleIssues.length})
+                  </button>
+                  <button
+                    className="btn"
+                    style={{
+                      fontSize: "0.72rem",
+                      padding: "0.2rem 0.6rem",
+                      background: issueTab === "all" ? "var(--surface-raised)" : "transparent",
+                      border: "none",
+                      color: issueTab === "all" ? "var(--text)" : "var(--muted)",
+                      fontWeight: issueTab === "all" ? 600 : 400,
+                    }}
+                    onClick={() => setIssueTab("all")}
+                  >
+                    All open ({data.allOpenIssues?.length || data.backlogHealth.openCount})
+                  </button>
+                </div>
+              </div>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                Delivered in view: <strong style={{ color: "var(--success)" }}>{deliveredCount}</strong> / {displayedIssues.length}
+              </span>
+            </div>
+
+            {displayedIssues.length === 0 && <p className="empty-state">No issues in this view.</p>}
+            {displayedIssues.map((i) => (
+              <StaleIssueRow
+                key={i.number}
+                issue={i}
+                repo={repo}
+                delivery={deliveredSolutions[i.number]}
+                onDelivered={handleSolutionDelivered}
+              />
             ))}
           </div>
 
@@ -722,14 +813,284 @@ function DashboardView({ repo }) {
             ))}
           </div>
 
-          <BugScanCard repo={repo} />
+          <BugScanCard
+            repo={repo}
+            deliveredSolutions={deliveredSolutions}
+            onDelivered={handleSolutionDelivered}
+          />
         </div>
       )}
     </div>
   );
 }
 
-function BugScanCard({ repo }) {
+function BugScanFindingRow({ finding, index, repo, deliveredSolutions = {}, onDelivered, filed, onFile }) {
+  const [openSolve, setOpenSolve] = useState(false);
+  const [solutionText, setSolutionText] = useState("");
+  const [generatingSolution, setGeneratingSolution] = useState(false);
+  const [postingComment, setPostingComment] = useState(false);
+  const [postSuccess, setPostSuccess] = useState(null);
+  const [postError, setPostError] = useState("");
+  const [creatingPR, setCreatingPR] = useState(false);
+  const [prSuccess, setPrSuccess] = useState(null);
+  const [prError, setPrError] = useState("");
+
+  const issueNumber = filed?.number;
+  const delivery = issueNumber ? deliveredSolutions[issueNumber] : null;
+  const effectivePr = prSuccess || delivery?.pr;
+  const effectiveComment = postSuccess || delivery?.comment;
+
+  async function generateSolution() {
+    setGeneratingSolution(true);
+    setPostError("");
+    setPrError("");
+    try {
+      const res = await fetch("/api/generate-solution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repositoryId: repo.id,
+          title: `[Bug finding] ${finding.filePath || ""}: ${finding.issue.slice(0, 70)}`,
+          issueBody: `File: ${finding.filePath || "N/A"}\nCategory: ${finding.category || "Bug"}\nIssue: ${finding.issue}`,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) setSolutionText(data.solution);
+      else setPostError(data.error || "Failed to generate solution");
+    } catch (err) {
+      setPostError(err.message);
+    } finally {
+      setGeneratingSolution(false);
+    }
+  }
+
+  async function handleCreatePR() {
+    if (!solutionText.trim() || !issueNumber) return;
+    setCreatingPR(true);
+    setPrError("");
+    try {
+      const res = await fetch("/api/create-pr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          owner: repo.owner,
+          repo: repo.name,
+          issueNumber,
+          title: `fix: resolve AI bug finding #${issueNumber} (${finding.filePath || ""})`,
+          body: solutionText,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPrSuccess(data);
+        onDelivered?.(issueNumber, "pr", data);
+      } else {
+        setPrError(data.error || "Failed to create PR");
+      }
+    } catch (err) {
+      setPrError(err.message);
+    } finally {
+      setCreatingPR(false);
+    }
+  }
+
+  async function postSolution() {
+    if (!solutionText.trim() || !issueNumber) return;
+    setPostingComment(true);
+    setPostError("");
+    try {
+      const res = await fetch("/api/post-issue-solution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          owner: repo.owner,
+          repo: repo.name,
+          issueNumber,
+          comment: solutionText,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPostSuccess({ url: data.url });
+        onDelivered?.(issueNumber, "comment", data);
+      } else {
+        setPostError(data.error || "Failed to post solution");
+      }
+    } catch (err) {
+      setPostError(err.message);
+    } finally {
+      setPostingComment(false);
+    }
+  }
+
+  return (
+    <div style={{ padding: "0.75rem 0.9rem", background: "var(--surface-raised)", borderRadius: 8, border: "1px solid var(--border)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+            {finding.filePath && <span className="mono" style={{ fontSize: "0.78rem", color: "var(--accent)" }}>{finding.filePath}</span>}
+            {finding.category && <span className="badge">{finding.category}</span>}
+            {issueNumber && (
+              <a
+                href={filed.url}
+                target="_blank"
+                rel="noreferrer"
+                className="mono"
+                style={{ fontSize: "0.75rem", color: "var(--muted)", textDecoration: "underline" }}
+              >
+                #{issueNumber}
+              </a>
+            )}
+          </div>
+          <p style={{ fontSize: "0.85rem", margin: 0, lineHeight: 1.45 }}>{finding.issue}</p>
+        </div>
+
+        {/* Status / Delivery Column */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {effectivePr ? (
+            <a
+              href={effectivePr.url}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: "0.72rem",
+                fontWeight: 600,
+                color: "var(--success)",
+                background: "rgba(34, 197, 94, 0.12)",
+                border: "1px solid rgba(34, 197, 94, 0.3)",
+                borderRadius: 4,
+                padding: "0.2rem 0.5rem",
+                textDecoration: "none",
+              }}
+            >
+              ✓ PR #{effectivePr.number} Delivered
+            </a>
+          ) : effectiveComment ? (
+            <a
+              href={effectiveComment.url}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: "0.72rem",
+                fontWeight: 600,
+                color: "var(--accent)",
+                background: "rgba(59, 130, 246, 0.12)",
+                border: "1px solid rgba(59, 130, 246, 0.3)",
+                borderRadius: 4,
+                padding: "0.2rem 0.5rem",
+                textDecoration: "none",
+              }}
+            >
+              ✓ Solution Delivered
+            </a>
+          ) : !filed ? (
+            <button
+              className="btn btn-primary"
+              style={{ fontSize: "0.72rem", padding: "0.25rem 0.55rem" }}
+              onClick={() => onFile(finding, index)}
+            >
+              File as issue
+            </button>
+          ) : filed === "filing" ? (
+            <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}>Filing...</span>
+          ) : filed.error ? (
+            <span style={{ fontSize: "0.7rem", color: "var(--danger)" }}>{filed.error}</span>
+          ) : (
+            <span
+              style={{
+                fontSize: "0.72rem",
+                color: "var(--muted-2)",
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                padding: "0.2rem 0.5rem",
+              }}
+            >
+              Pending fix
+            </span>
+          )}
+
+          {issueNumber && (
+            <button
+              className="btn"
+              style={{ fontSize: "0.72rem", padding: "0.25rem 0.55rem" }}
+              onClick={() => {
+                setOpenSolve((prev) => !prev);
+                if (!solutionText && !openSolve) generateSolution();
+              }}
+            >
+              {openSolve ? "Hide fix" : "Draft fix / PR"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {openSolve && issueNumber && (
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+          {generatingSolution && <p className="empty-state" style={{ padding: "0.4rem 0" }}>Formulating code solution for AI finding...</p>}
+          {postError && <p style={{ color: "var(--danger)", fontSize: "0.78rem" }}>{postError}</p>}
+          {prError && <p style={{ color: "var(--danger)", fontSize: "0.78rem" }}>{prError}</p>}
+
+          {solutionText && (
+            <div>
+              <textarea
+                className="input"
+                style={{
+                  width: "100%",
+                  minHeight: 140,
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "0.78rem",
+                  lineHeight: 1.55,
+                  padding: "0.5rem 0.7rem",
+                  background: "var(--surface)",
+                  boxSizing: "border-box",
+                }}
+                value={solutionText}
+                onChange={(e) => setSolutionText(e.target.value)}
+              />
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <button
+                  className="btn btn-primary"
+                  style={{ fontSize: "0.74rem", padding: "0.3rem 0.65rem" }}
+                  onClick={postSolution}
+                  disabled={postingComment || !solutionText.trim()}
+                >
+                  {postingComment ? "Posting..." : `Push Solution to Issue #${issueNumber}`}
+                </button>
+                <button
+                  className="btn"
+                  style={{ fontSize: "0.74rem", padding: "0.3rem 0.65rem", background: "var(--surface)", borderColor: "var(--accent)", color: "var(--accent)" }}
+                  onClick={handleCreatePR}
+                  disabled={creatingPR || !solutionText.trim()}
+                >
+                  {creatingPR ? "Creating PR..." : "Open Pull Request on GitHub"}
+                </button>
+                {effectiveComment && (
+                  <span style={{ fontSize: "0.74rem", color: "var(--success)" }}>
+                    ✓ Comment posted
+                  </span>
+                )}
+                {effectivePr && (
+                  <span style={{ fontSize: "0.74rem", color: "var(--success)" }}>
+                    ✓ PR #{effectivePr.number} opened
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BugScanCard({ repo, deliveredSolutions = {}, onDelivered }) {
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState(null); // { findings, scannedFiles }
   const [error, setError] = useState("");
@@ -815,35 +1176,16 @@ function BugScanCard({ repo }) {
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {result.findings.map((f, i) => (
-              <div key={i} style={{ padding: "0.6rem 0.8rem", background: "var(--surface-raised)", borderRadius: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      {f.filePath && <p className="mono" style={{ fontSize: "0.78rem", color: "var(--accent)", margin: 0 }}>{f.filePath}</p>}
-                      {f.category && <span className="badge">{f.category}</span>}
-                    </div>
-                    <p style={{ fontSize: "0.85rem", margin: "3px 0 0" }}>{f.issue}</p>
-                  </div>
-                  <div style={{ flexShrink: 0 }}>
-                    {!filed[i] && (
-                      <button className="btn" style={{ fontSize: "0.72rem", padding: "0.3rem 0.5rem" }} onClick={() => fileAsIssue(f, i)}>
-                        File as issue
-                      </button>
-                    )}
-                    {filed[i] === "filing" && (
-                      <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}>Filing...</span>
-                    )}
-                    {filed[i]?.url && (
-                      <a href={filed[i].url} target="_blank" rel="noreferrer" style={{ fontSize: "0.72rem", color: "var(--success)" }}>
-                        ✓ Filed #{filed[i].number}
-                      </a>
-                    )}
-                    {filed[i]?.error && (
-                      <span style={{ fontSize: "0.7rem", color: "var(--danger)" }}>{filed[i].error}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <BugScanFindingRow
+                key={i}
+                finding={f}
+                index={i}
+                repo={repo}
+                filed={filed[i]}
+                deliveredSolutions={deliveredSolutions}
+                onDelivered={onDelivered}
+                onFile={fileAsIssue}
+              />
             ))}
           </div>
         </div>
@@ -852,7 +1194,7 @@ function BugScanCard({ repo }) {
   );
 }
 
-function StaleIssueRow({ issue, repo }) {
+function StaleIssueRow({ issue, repo, delivery = null, onDelivered = null }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [help, setHelp] = useState(null); // { answer, sources }
@@ -868,6 +1210,9 @@ function StaleIssueRow({ issue, repo }) {
   const [prSuccess, setPrSuccess] = useState(null);
   const [prError, setPrError] = useState("");
   const [copied, setCopied] = useState(false);
+
+  const effectivePr = prSuccess || delivery?.pr;
+  const effectiveComment = postSuccess || delivery?.comment;
 
   function copySolution() {
     if (!solutionText) return;
@@ -896,6 +1241,7 @@ function StaleIssueRow({ issue, repo }) {
       const data = await res.json();
       if (res.ok) {
         setPrSuccess(data);
+        onDelivered?.(issue.number, "pr", data);
       } else {
         setPrError(data.error || "Failed to create Pull Request");
       }
@@ -973,6 +1319,7 @@ function StaleIssueRow({ issue, repo }) {
       const data = await res.json();
       if (res.ok) {
         setPostSuccess({ url: data.url });
+        onDelivered?.(issue.number, "comment", data);
       } else {
         setPostError(data.error || "Failed to post solution to GitHub");
       }
@@ -986,19 +1333,78 @@ function StaleIssueRow({ issue, repo }) {
   return (
     <div style={{ margin: "8px 0", paddingBottom: 8, borderBottom: "1px solid var(--border)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <p style={{ fontSize: "0.85rem", margin: 0 }}>
+        <p style={{ fontSize: "0.85rem", margin: 0, minWidth: 0 }}>
           <span className="mono" style={{ color: "var(--muted)" }}>
             #{issue.number}
           </span>{" "}
           {issue.title} — last touched {new Date(issue.updatedAt).toLocaleDateString()}
         </p>
-        <button
-          className="btn"
-          style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem", flexShrink: 0 }}
-          onClick={() => (open ? setOpen(false) : getHelp())}
-        >
-          {open ? "Hide" : "Get AI help"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {effectivePr ? (
+            <a
+              href={effectivePr.url}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: "0.72rem",
+                fontWeight: 600,
+                color: "var(--success)",
+                background: "rgba(34, 197, 94, 0.12)",
+                border: "1px solid rgba(34, 197, 94, 0.3)",
+                borderRadius: 4,
+                padding: "0.2rem 0.5rem",
+                textDecoration: "none",
+              }}
+            >
+              ✓ PR #{effectivePr.number} Delivered
+            </a>
+          ) : effectiveComment ? (
+            <a
+              href={effectiveComment.url}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: "0.72rem",
+                fontWeight: 600,
+                color: "var(--accent)",
+                background: "rgba(59, 130, 246, 0.12)",
+                border: "1px solid rgba(59, 130, 246, 0.3)",
+                borderRadius: 4,
+                padding: "0.2rem 0.5rem",
+                textDecoration: "none",
+              }}
+            >
+              ✓ Solution Delivered
+            </a>
+          ) : (
+            <span
+              style={{
+                fontSize: "0.72rem",
+                color: "var(--muted-2)",
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                padding: "0.2rem 0.5rem",
+              }}
+            >
+              Pending
+            </span>
+          )}
+
+          <button
+            className="btn"
+            style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}
+            onClick={() => (open ? setOpen(false) : getHelp())}
+          >
+            {open ? "Hide" : "Get AI help"}
+          </button>
+        </div>
       </div>
 
       {open && (
