@@ -20,10 +20,15 @@ export async function POST(request) {
   }
 
   const db = getDb();
-  const { rows: repoRows } = await db.query(`SELECT id FROM repositories WHERE id = $1`, [repositoryId]);
+  const { rows: repoRows } = await db.query(
+    `SELECT id, owner, name, default_branch FROM repositories WHERE id = $1`,
+    [repositoryId]
+  );
   if (repoRows.length === 0) {
     return NextResponse.json({ error: "Repository not found" }, { status: 404 });
   }
+
+  const repo = repoRows[0];
 
   try {
     const question = `A user reported this bug/issue:\nTitle: "${title}"\n${issueBody ? `Description:\n${issueBody}\n` : ""}\nWhich files in the codebase are responsible for this, and what specifically should someone inspect or fix?`;
@@ -34,6 +39,12 @@ export async function POST(request) {
       contextText: `${title} ${issueBody || ""}`,
       limit: TOP_K,
       isCodeQuestion: true,
+      githubContext: {
+        token: user.access_token,
+        owner: repo.owner,
+        repo: repo.name,
+        defaultBranch: repo.default_branch || "main",
+      },
     });
 
     const { answer, sources } = await generateGroundedAnswer(question, chunks);

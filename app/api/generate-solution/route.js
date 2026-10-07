@@ -15,10 +15,15 @@ export async function POST(request) {
   }
 
   const db = getDb();
-  const { rows: repoRows } = await db.query(`SELECT id FROM repositories WHERE id = $1`, [repositoryId]);
+  const { rows: repoRows } = await db.query(
+    `SELECT id, owner, name, default_branch FROM repositories WHERE id = $1`,
+    [repositoryId]
+  );
   if (repoRows.length === 0) {
     return NextResponse.json({ error: "Repository not found" }, { status: 404 });
   }
+
+  const repo = repoRows[0];
 
   try {
     const question = `Generate concrete solution and code fix for issue: ${title}\n${issueBody || ""}`;
@@ -28,6 +33,12 @@ export async function POST(request) {
       contextText: `${title} ${issueBody || ""}`,
       limit: 6,
       isCodeQuestion: true,
+      githubContext: {
+        token: user.access_token,
+        owner: repo.owner,
+        repo: repo.name,
+        defaultBranch: repo.default_branch || "main",
+      },
     });
 
     const solution = await generateIssueSolution(title, issueBody, chunks);

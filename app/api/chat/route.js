@@ -22,12 +22,15 @@ export async function POST(request) {
   // a shared workspace, not a per-user private one. We still require login
   // (checked above) so it's not open to the public internet, and we still
   // confirm the repo exists so a bad/old id gives a clean error.
-  const { rows: repoRows } = await db.query(`SELECT id FROM repositories WHERE id = $1`, [
-    repositoryId,
-  ]);
+  const { rows: repoRows } = await db.query(
+    `SELECT id, owner, name, default_branch FROM repositories WHERE id = $1`,
+    [repositoryId]
+  );
   if (repoRows.length === 0) {
     return NextResponse.json({ error: "Repository not found" }, { status: 404 });
   }
+
+  const repo = repoRows[0];
 
   try {
     const chunks = await findRelevantChunks(db, {
@@ -36,6 +39,12 @@ export async function POST(request) {
       contextText: question,
       limit: TOP_K,
       isCodeQuestion: true,
+      githubContext: {
+        token: user.access_token,
+        owner: repo.owner,
+        repo: repo.name,
+        defaultBranch: repo.default_branch || "main",
+      },
     });
 
     const { answer, sources } = await generateGroundedAnswer(question, chunks);

@@ -36,7 +36,7 @@ export async function POST(request) {
   try {
     // The bot posts using the token of whoever connected this repo in our app.
     const { rows } = await db.query(
-      `SELECT r.id AS repository_id, u.access_token
+      `SELECT r.id AS repository_id, r.default_branch, u.access_token
        FROM repositories r JOIN users u ON u.id = r.user_id
        WHERE r.owner = $1 AND r.name = $2`,
       [owner, repo]
@@ -44,7 +44,7 @@ export async function POST(request) {
     if (rows.length === 0) {
       return NextResponse.json({ error: "Repository not connected to CodeSphere AI" }, { status: 404 });
     }
-    const { repository_id: repositoryId, access_token: token } = rows[0];
+    const { repository_id: repositoryId, default_branch: defaultBranch, access_token: token } = rows[0];
 
     const { summary, label } = await generateIssueSummary(issue.title, issue.body);
 
@@ -60,6 +60,12 @@ export async function POST(request) {
         contextText: `${issue.title} ${issue.body || ""}`,
         limit: 5,
         isCodeQuestion: true,
+        githubContext: {
+          token,
+          owner,
+          repo,
+          defaultBranch: defaultBranch || "main",
+        },
       });
 
       if (chunks.length > 0) {
