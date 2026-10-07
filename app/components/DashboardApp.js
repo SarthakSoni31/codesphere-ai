@@ -864,6 +864,48 @@ function StaleIssueRow({ issue, repo }) {
   const [postSuccess, setPostSuccess] = useState(null);
   const [postError, setPostError] = useState("");
 
+  const [creatingPR, setCreatingPR] = useState(false);
+  const [prSuccess, setPrSuccess] = useState(null);
+  const [prError, setPrError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  function copySolution() {
+    if (!solutionText) return;
+    navigator.clipboard.writeText(solutionText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleCreatePR() {
+    if (!solutionText.trim()) return;
+    setCreatingPR(true);
+    setPrError("");
+    setPrSuccess(null);
+    try {
+      const res = await fetch("/api/create-pr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          owner: repo.owner,
+          repo: repo.name,
+          issueNumber: issue.number,
+          title: `fix: resolve issue #${issue.number} (${issue.title.slice(0, 50)})`,
+          body: solutionText,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPrSuccess(data);
+      } else {
+        setPrError(data.error || "Failed to create Pull Request");
+      }
+    } catch (err) {
+      setPrError(err.message);
+    } finally {
+      setCreatingPR(false);
+    }
+  }
+
   async function getHelp() {
     setOpen(true);
     if (help) return; // already fetched, just toggling open
@@ -1022,8 +1064,8 @@ function StaleIssueRow({ issue, repo }) {
                       onChange={(e) => setSolutionText(e.target.value)}
                     />
 
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, flexWrap: "wrap", gap: 8 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, flexWrap: "wrap", gap: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <button
                           className="btn btn-primary"
                           style={{ fontSize: "0.76rem", padding: "0.35rem 0.75rem" }}
@@ -1031,6 +1073,21 @@ function StaleIssueRow({ issue, repo }) {
                           disabled={postingComment || !solutionText.trim()}
                         >
                           {postingComment ? "Posting to GitHub..." : `Push Solution to Issue #${issue.number}`}
+                        </button>
+                        <button
+                          className="btn"
+                          style={{ fontSize: "0.76rem", padding: "0.35rem 0.75rem", background: "var(--surface)", borderColor: "var(--accent)", color: "var(--accent)" }}
+                          onClick={handleCreatePR}
+                          disabled={creatingPR || !solutionText.trim()}
+                        >
+                          {creatingPR ? "Creating PR..." : "Open Pull Request on GitHub"}
+                        </button>
+                        <button
+                          className="btn"
+                          style={{ fontSize: "0.74rem", padding: "0.35rem 0.6rem" }}
+                          onClick={copySolution}
+                        >
+                          {copied ? "✓ Copied" : "Copy"}
                         </button>
                         <button
                           className="btn"
@@ -1058,6 +1115,24 @@ function StaleIssueRow({ issue, repo }) {
                       {postError && (
                         <span style={{ fontSize: "0.78rem", color: "var(--danger)" }}>
                           {postError}
+                        </span>
+                      )}
+                      {prSuccess && (
+                        <span style={{ fontSize: "0.78rem", color: "var(--success)" }}>
+                          ✓ PR #{prSuccess.number} opened on GitHub —{" "}
+                          <a
+                            href={prSuccess.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: "var(--success)", textDecoration: "underline" }}
+                          >
+                            View Pull Request &rarr;
+                          </a>
+                        </span>
+                      )}
+                      {prError && (
+                        <span style={{ fontSize: "0.78rem", color: "var(--danger)" }}>
+                          {prError}
                         </span>
                       )}
                     </div>
