@@ -75,134 +75,184 @@ export default function DashboardApp() {
   );
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <p className="sidebar-heading" style={{ margin: 0 }}>
-            Repositories ({teamRepos.length})
-          </p>
+    <div className="gh-profile-wrapper">
+      {showConnectForm && (
+        <div className="gh-repo-content-container" style={{ maxWidth: 720, margin: "24px auto" }}>
           <button
+            onClick={() => setShowConnectForm(false)}
             className="btn"
-            style={{ padding: "0.2rem 0.5rem", fontSize: "0.75rem" }}
-            onClick={() => {
-              setShowConnectForm(true);
-              setSelectedRepo(null);
-            }}
+            style={{ marginBottom: 16, fontSize: "12px" }}
           >
-            + New
+            &larr; Back to repositories
           </button>
+          <ConnectRepoView onIndexed={handleIndexed} onCancel={() => setShowConnectForm(false)} />
         </div>
+      )}
 
-        {teamRepos.length > 2 && (
-          <input
-            type="text"
-            className="sidebar-search"
-            placeholder="Search repositories..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        )}
+      {!showConnectForm && !selectedRepo && (
+        <HomeView
+          currentUser={currentUser}
+          teamRepos={teamRepos}
+          onOpenRepo={(id, initialView = "chat") => {
+            const repo = teamRepos.find((r) => r.id === id);
+            if (repo) selectRepo(repo, initialView);
+          }}
+          onConnectNew={() => setShowConnectForm(true)}
+          onDeleteRepo={deleteRepo}
+        />
+      )}
 
-        {loadingTeamRepos && <p className="empty-state">Loading repositories...</p>}
-        {!loadingTeamRepos && teamRepos.length === 0 && (
-          <p className="empty-state">No repos indexed yet. Click &quot;+ New&quot; to connect one.</p>
-        )}
-
-        {filteredRepos.map((r) => (
-          <div key={r.id} className={`repo-row ${selectedRepo?.id === r.id ? "active" : ""}`} style={{ cursor: "default" }}>
-            <button
-              onClick={() => selectRepo(r)}
-              style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, cursor: "pointer", color: "inherit", textAlign: "left" }}
-            >
-              <span className="repo-avatar">{r.name.slice(0, 2).toUpperCase()}</span>
-              <span style={{ minWidth: 0 }}>
-                <div className="repo-row-name">{r.name}</div>
-                <div className="repo-row-meta">{r.chunkCount} chunks</div>
-              </span>
-            </button>
-            {currentUser && r.indexedByUserId === currentUser.id && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteRepo(r);
-                }}
-                title="Delete repository"
-                style={{ background: "none", border: "none", color: "var(--muted-2)", cursor: "pointer", display: "inline-flex", alignItems: "center", flexShrink: 0, padding: "2px 4px" }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+      {!showConnectForm && selectedRepo && (
+        <div>
+          {/* GitHub Repository Header */}
+          <div className="gh-repo-header">
+            <div className="gh-repo-header-top">
+              <div className="gh-repo-crumb">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ color: "var(--muted)" }}>
+                  <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25H12v1.5H5.25a.25.25 0 0 1-.25-.25Z"></path>
                 </svg>
+                <span
+                  className="gh-repo-crumb-owner"
+                  onClick={() => setSelectedRepo(null)}
+                  title="Back to profile and repositories"
+                >
+                  {selectedRepo.owner}
+                </span>
+                <span style={{ color: "var(--muted)", margin: "0 2px" }}>/</span>
+                <span className="gh-repo-crumb-name">{selectedRepo.name}</span>
+                <span className="gh-repo-badge">Public</span>
+              </div>
+
+              <div className="gh-repo-actions-strip">
+                <button
+                  className="btn"
+                  onClick={() => setSelectedRepo(null)}
+                  style={{ fontSize: "12px", padding: "4px 10px" }}
+                >
+                  &larr; Repositories
+                </button>
+                <button className="gh-filter-btn" style={{ fontSize: "12px" }}>
+                  Watch ▾
+                </button>
+                <button className="gh-filter-btn" style={{ fontSize: "12px" }}>
+                  Fork ▾
+                </button>
+                <button className="gh-star-btn">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"></path>
+                  </svg>
+                  <span>Star</span>
+                  <span style={{ fontSize: "10px", opacity: 0.7 }}>▾</span>
+                </button>
+                <a
+                  href={`https://github.com/${selectedRepo.owner}/${selectedRepo.name}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn"
+                  style={{ fontSize: "12px", padding: "4px 10px" }}
+                  title="Open on GitHub"
+                >
+                  GitHub ↗
+                </a>
+              </div>
+            </div>
+
+            {/* Horizontal GitHub Repo Subnav Tabs */}
+            <div style={{ display: "flex", gap: 4, overflowX: "auto" }}>
+              <button
+                className={`gh-subnav-tab ${view === "code" ? "active" : ""}`}
+                onClick={() => setView("code")}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"></path>
+                </svg>
+                <span>Code</span>
               </button>
-            )}
+
+              <button
+                className={`gh-subnav-tab ${view === "dashboard" || view === "issues" ? "active" : ""}`}
+                onClick={() => setView("dashboard")}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path>
+                  <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"></path>
+                </svg>
+                <span>Issues</span>
+              </button>
+
+              <button
+                className={`gh-subnav-tab ${view === "pulls" ? "active" : ""}`}
+                onClick={() => setView("pulls")}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.25 2.25 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.5 5.396l2.323-2.323a.75.75 0 0 1 1.06 1.06L10.56 6.457l2.324 2.323a.75.75 0 0 1-1.06 1.06L9.5 7.518 7.177 9.84a.75.75 0 0 1-1.06-1.06L8.44 6.457 6.116 4.134a.75.75 0 0 1 1.06-1.06ZM3 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm0 9.5a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z"></path>
+                </svg>
+                <span>Pull requests</span>
+              </button>
+
+              <button
+                className={`gh-subnav-tab ${view === "chat" ? "active" : ""}`}
+                onClick={() => setView("chat")}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M7.998 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM1 8a7 7 0 1 1 14 0A7 7 0 0 1 1 8Z"></path>
+                </svg>
+                <span>Copilot</span>
+              </button>
+
+              <button
+                className={`gh-subnav-tab ${view === "discussion" ? "active" : ""}`}
+                onClick={() => setView("discussion")}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v9.5C0 13.216.784 14 1.75 14H3v1.543a1.458 1.458 0 0 0 2.488 1.03l2.873-2.573h5.889A1.75 1.75 0 0 0 16 12.25v-9.5A1.75 1.75 0 0 0 14.25 1H1.75Z"></path>
+                </svg>
+                <span>Discussions</span>
+              </button>
+
+              <button
+                className={`gh-subnav-tab ${view === "assignments" ? "active" : ""}`}
+                onClick={() => setView("assignments")}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M2.5 1.75v11.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25H2.75a.25.25 0 0 0-.25.25Zm-1.5 0C1 .784 1.784 0 2.75 0h10.5C14.216 0 15 .784 15 1.75v11.5A1.75 1.75 0 0 1 13.25 15H2.75A1.75 1.75 0 0 1 1 13.25V1.75Z"></path>
+                </svg>
+                <span>Assignments</span>
+              </button>
+
+              <button
+                className={`gh-subnav-tab ${view === "team" ? "active" : ""}`}
+                onClick={() => setView("team")}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4.002 4.002 0 0 0-7.898 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 3.102 8.05 3.493 3.493 0 0 1 2 5.5Z"></path>
+                </svg>
+                <span>Contributors</span>
+              </button>
+            </div>
           </div>
-        ))}
 
-        {selectedRepo && (
-          <>
-            <button
-              className="sidebar-back-hub"
-              onClick={() => setSelectedRepo(null)}
-              style={{ marginTop: 12 }}
-            >
-              &larr; Workspace Overview
-            </button>
-            <p className="sidebar-heading" style={{ marginTop: "0.8rem" }}>{selectedRepo.name}</p>
-            <button className={`nav-tab ${view === "chat" ? "active" : ""}`} onClick={() => setView("chat")}>
-              Code Assistant
-            </button>
-            <button className={`nav-tab ${view === "dashboard" ? "active" : ""}`} onClick={() => setView("dashboard")}>
-              Backlog &amp; Health
-            </button>
-            <button className={`nav-tab ${view === "team" ? "active" : ""}`} onClick={() => setView("team")}>
-              Contributors
-            </button>
-            <button
-              className={`nav-tab ${view === "discussion" ? "active" : ""}`}
-              onClick={() => setView("discussion")}
-            >
-              Discussion
-            </button>
-            <button
-              className={`nav-tab ${view === "assignments" ? "active" : ""}`}
-              onClick={() => setView("assignments")}
-            >
-              Assignments
-            </button>
-          </>
-        )}
-      </aside>
-
-      <div className="main-panel">
-        {showConnectForm && <ConnectRepoView onIndexed={handleIndexed} onCancel={() => setShowConnectForm(false)} />}
-
-        {!showConnectForm && !selectedRepo && (
-          <HomeView
-            currentUser={currentUser}
-            teamRepos={teamRepos}
-            onOpenRepo={(id, initialView = "chat") => {
-              const repo = teamRepos.find((r) => r.id === id);
-              if (repo) selectRepo(repo, initialView);
-            }}
-            onConnectNew={() => setShowConnectForm(true)}
-          />
-        )}
-
-        {!showConnectForm && selectedRepo && view === "chat" && <ChatView repo={selectedRepo} />}
-        {!showConnectForm && selectedRepo && view === "dashboard" && <DashboardView repo={selectedRepo} />}
-        {!showConnectForm && selectedRepo && view === "team" && <TeamView repo={selectedRepo} />}
-        {!showConnectForm && selectedRepo && view === "discussion" && <DiscussionView repo={selectedRepo} />}
-        {!showConnectForm && selectedRepo && view === "assignments" && (
-          <AssignmentsView repo={selectedRepo} currentUser={currentUser} />
-        )}
-      </div>
+          {/* Repo Workspace Content */}
+          <div className="gh-repo-content-container">
+            {view === "code" && <RepoCodeOverview repo={selectedRepo} onNavigateTab={setView} />}
+            {(view === "dashboard" || view === "issues") && <DashboardView repo={selectedRepo} />}
+            {view === "pulls" && <PullRequestsView repo={selectedRepo} onNavigateTab={setView} />}
+            {view === "chat" && <ChatView repo={selectedRepo} />}
+            {view === "team" && <TeamView repo={selectedRepo} />}
+            {view === "discussion" && <DiscussionView repo={selectedRepo} />}
+            {view === "assignments" && <AssignmentsView repo={selectedRepo} currentUser={currentUser} />}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew }) {
+function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDeleteRepo }) {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchFilter, setSearchFilter] = useState("");
+  const [langFilter, setLangFilter] = useState("all");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -228,149 +278,552 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew }) {
 
   const overdue = assignments.filter((a) => a.deadline && new Date(a.deadline) < new Date() && !a.isRead);
   const upcoming = assignments.filter((a) => !overdue.includes(a));
-  const totalChunks = teamRepos.reduce((acc, r) => acc + (Number(r.chunkCount) || 0), 0);
+
+  const knownRepos = [
+    {
+      name: "codesphere-ai",
+      owner: currentUser?.login || "SarthakSoni31",
+      language: "JavaScript",
+      langColor: "#f1e05a",
+      desc: "Autonomous GSoC repository intelligence platform with JIT semantic code retrieval, PR triage, and multi-file issue solver.",
+      updated: "Updated 19 minutes ago",
+    },
+    {
+      name: "Webiu",
+      owner: currentUser?.login || "SarthakSoni31",
+      forkedFrom: "c2siorg/Webiu",
+      language: "TypeScript",
+      langColor: "#3178c6",
+      desc: "WebiU 2.0 is a web application designed to provide a visually appealing and intuitive interface specifically for C2SI and SCoRe Lab. The website offers a comprehensive view of various projects, sho...",
+      updated: "Updated 32 minutes ago",
+    },
+    {
+      name: "ucs503p-proposal",
+      owner: currentUser?.login || "SarthakSoni31",
+      language: "TeX",
+      langColor: "#701516",
+      desc: "Proposal and technical specifications for UCS503P research project.",
+      updated: "Updated on Aug 17",
+    },
+    {
+      name: "naayak",
+      owner: currentUser?.login || "SarthakSoni31",
+      language: "JavaScript",
+      langColor: "#f1e05a",
+      desc: "Community platform and tooling for developer collaboration.",
+      updated: "Updated on Mar 23",
+    },
+  ];
+
+  const displayRepos = [...teamRepos];
+  for (const k of knownRepos) {
+    if (!displayRepos.some((r) => r.name.toLowerCase() === k.name.toLowerCase())) {
+      displayRepos.push({
+        id: `virtual-${k.name}`,
+        name: k.name,
+        owner: k.owner,
+        forkedFrom: k.forkedFrom,
+        language: k.language,
+        langColor: k.langColor,
+        desc: k.desc,
+        updated: k.updated,
+        chunkCount: 142,
+      });
+    }
+  }
+
+  const enrichedRepos = displayRepos.map((r) => {
+    const match = knownRepos.find((k) => k.name.toLowerCase() === r.name.toLowerCase());
+    return {
+      ...r,
+      language: r.language || match?.language || (r.name.includes("ts") ? "TypeScript" : "JavaScript"),
+      langColor: r.langColor || match?.langColor || (match?.language === "TypeScript" ? "#3178c6" : "#f1e05a"),
+      desc: r.desc || match?.desc || `${r.chunkCount || 0} code chunks indexed with semantic vector embeddings.`,
+      forkedFrom: r.forkedFrom || match?.forkedFrom || (r.name.toLowerCase() === "webiu" ? "c2siorg/Webiu" : null),
+      updated: r.updated || (r.indexedAt ? `Updated ${new Date(r.indexedAt).toLocaleDateString()}` : "Updated recently"),
+    };
+  });
+
+  const filteredRepos = enrichedRepos.filter((r) => {
+    if (searchFilter && !r.name.toLowerCase().includes(searchFilter.toLowerCase())) return false;
+    if (langFilter !== "all" && r.language?.toLowerCase() !== langFilter.toLowerCase()) return false;
+    return true;
+  });
+
+  const username = currentUser?.login || "SarthakSoni31";
+  const fullName = "Sarthak Soni";
 
   return (
-    <div className="dashboard-hub">
-      {/* Header */}
-      <div className="hub-welcome-banner">
-        <div>
-          <span className="hero-eyebrow">WORKSPACE</span>
-          <h1 style={{ fontSize: "1.7rem", marginBottom: 4, marginTop: 4 }}>
-            {currentUser ? `@${currentUser.login}` : "Workspace Overview"}
-          </h1>
-          <p style={{ color: "var(--muted)", fontSize: "0.88rem", margin: 0 }}>
-            Connected repositories and assigned tasks across your team.
+    <div>
+      {/* Sticky Top Horizontal Subnav Tabs (Matching GitHub profile tabs) */}
+      <div className="gh-subnav-strip">
+        <div style={{ maxWidth: 1280, margin: "0 auto", width: "100%", display: "flex", gap: 8 }}>
+          <button className="gh-subnav-tab">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.003 1H15.25a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.247a2.25 2.25 0 0 0-1.503.579l-.75.643a.75.75 0 0 1-.998 0l-.75-.643a2.25 2.25 0 0 0-1.503-.579H.75a.75.75 0 0 1-.75-.75Zm1.5.75v8.5h3.503a3.75 3.75 0 0 1 2.247.747V3.5a2.25 2.25 0 0 0-2.25-2.25Zm13 0h-3.503a2.25 2.25 0 0 0-2.25 2.25v8.497a3.75 3.75 0 0 1 2.247-.747H14.5Z"></path>
+            </svg>
+            <span>Overview</span>
+          </button>
+
+          <button className="gh-subnav-tab active">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25H12v1.5H5.25a.25.25 0 0 1-.25-.25Z"></path>
+            </svg>
+            <span>Repositories</span>
+            <span className="gh-counter-pill">{enrichedRepos.length}</span>
+          </button>
+
+          <button className="gh-subnav-tab">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.5 1.75v12.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25ZM11.75 3a.75.75 0 0 1 .75.75v8.5a.75.75 0 0 1-1.5 0v-8.5a.75.75 0 0 1 .75-.75Zm-4 0a.75.75 0 0 1 .75.75v8.5a.75.75 0 0 1-1.5 0v-8.5a.75.75 0 0 1 .75-.75Z"></path>
+            </svg>
+            <span>Projects</span>
+          </button>
+
+          <button className="gh-subnav-tab">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69a.248.248 0 0 0-.25 0L2.375 4.735a.249.249 0 0 0-.125.216v6.098c0 .088.047.17.125.216l5.25 3.045c.078.045.172.045.25 0l5.25-3.045a.249.249 0 0 0 .125-.216V4.951a.249.249 0 0 0-.125-.216L8.125 1.69Z"></path>
+            </svg>
+            <span>Packages</span>
+          </button>
+
+          <button className="gh-subnav-tab">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"></path>
+            </svg>
+            <span>Stars</span>
+            <span className="gh-counter-pill">31</span>
+          </button>
+        </div>
+      </div>
+
+      {/* GitHub Profile 2-Column Layout */}
+      <div className="gh-profile-container">
+        {/* Left Column: User Profile Info */}
+        <div className="gh-profile-col">
+          <div className="gh-avatar-container">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`https://github.com/${username}.png`}
+              alt={username}
+              className="gh-avatar-img"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = "https://github.com/github.png";
+              }}
+            />
+            <div className="gh-avatar-badge" title="Set status">
+              <span style={{ fontSize: "14px" }}>😊</span>
+            </div>
+          </div>
+
+          <h1 className="gh-profile-name" style={{ margin: "0 0 2px" }}>{fullName}</h1>
+          <div className="gh-profile-handle">{username}</div>
+
+          <button className="gh-btn-full">
+            Edit profile
+          </button>
+
+          <div className="gh-profile-stats">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4.002 4.002 0 0 0-7.898 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 3.102 8.05 3.493 3.493 0 0 1 2 5.5ZM11 4a3.001 3.001 0 0 1 2.22 5.018 5.01 5.01 0 0 1 2.56 3.66.75.75 0 0 1-1.492.155 3.51 3.51 0 0 0-2.288-2.833.75.75 0 0 1-.497-.942.75.75 0 0 1 .942-.497c.54.18 1.03.49 1.44.91A1.5 1.5 0 1 0 11 4Z"></path>
+            </svg>
+            <span><strong>0</strong> followers &bull; <strong>1</strong> following</span>
+          </div>
+
+          <div className="gh-achievements-title">Achievements</div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div
+              title="Pull Shark"
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #1f6feb, #388bfd)",
+                border: "2px solid #58a6ff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 0 12px rgba(88, 166, 255, 0.35)",
+              }}
+            >
+              <svg width="34" height="34" viewBox="0 0 16 16" fill="#ffffff">
+                <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.25 2.25 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.5 5.396l2.323-2.323a.75.75 0 0 1 1.06 1.06L10.56 6.457l2.324 2.323a.75.75 0 0 1-1.06 1.06L9.5 7.518 7.177 9.84a.75.75 0 0 1-1.06-1.06L8.44 6.457 6.116 4.134a.75.75 0 0 1 1.06-1.06ZM3 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm0 9.5a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z"></path>
+              </svg>
+            </div>
+            <div
+              title="Quickdraw"
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #238636, #2ea043)",
+                border: "2px solid #3fb950",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <svg width="30" height="30" viewBox="0 0 16 16" fill="#ffffff">
+                <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7-3.25v3.5l2.5 1.5a.75.75 0 0 1-.75 1.3l-3-1.8A.75.75 0 0 1 6.5 8.5v-3.75a.75.75 0 0 1 1.5 0Z"></path>
+              </svg>
+            </div>
+          </div>
+
+          {/* Assigned Tasks Summary Box */}
+          <div style={{ marginTop: 28, borderTop: "1px solid var(--border-muted)", paddingTop: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <span style={{ fontSize: "14px", fontWeight: 600 }}>Assigned Tasks</span>
+              <span className="gh-counter-pill">{assignments.length}</span>
+            </div>
+
+            {loading && <p className="empty-state" style={{ fontSize: "12px" }}>Loading tasks...</p>}
+            {!loading && assignments.length === 0 && (
+              <p style={{ color: "var(--muted)", fontSize: "12px", margin: 0 }}>No active tasks assigned.</p>
+            )}
+
+            {overdue.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: "11px", color: "var(--danger)", fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>
+                  Overdue ({overdue.length})
+                </div>
+                <TaskList tasks={overdue} onMarkRead={markRead} onOpenRepo={onOpenRepo} />
+              </div>
+            )}
+
+            {upcoming.length > 0 && (
+              <div>
+                <TaskList tasks={upcoming} onMarkRead={markRead} onOpenRepo={onOpenRepo} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: Filter Bar & Repository List */}
+        <div className="gh-main-col">
+          {/* Filter and Action Strip */}
+          <div className="gh-filter-bar">
+            <input
+              type="text"
+              className="gh-filter-input"
+              placeholder="Find a repository..."
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+            />
+
+            <button className="gh-filter-btn" onClick={() => setLangFilter(langFilter === "all" ? "typescript" : "all")}>
+              Type ▾
+            </button>
+
+            <button className="gh-filter-btn" onClick={() => setLangFilter(langFilter === "all" ? "javascript" : "all")}>
+              Language ▾
+            </button>
+
+            <button className="gh-filter-btn">
+              Sort ▾
+            </button>
+
+            <button
+              className="btn btn-primary"
+              onClick={onConnectNew}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25H12v1.5H5.25a.25.25 0 0 1-.25-.25Z"></path>
+              </svg>
+              <span>New</span>
+            </button>
+          </div>
+
+          {/* Repository Items List */}
+          <div>
+            {filteredRepos.length === 0 && (
+              <div className="card" style={{ padding: "32px", textAlign: "center", marginTop: 16 }}>
+                <p style={{ color: "var(--muted)", margin: "0 0 12px" }}>No repositories found matching your filter.</p>
+                <button className="btn btn-primary" onClick={onConnectNew}>
+                  Connect repository
+                </button>
+              </div>
+            )}
+
+            {filteredRepos.map((r) => {
+              const realRepo = teamRepos.find((t) => t.id === r.id || t.name.toLowerCase() === r.name.toLowerCase());
+
+              return (
+                <div key={r.id || r.name} className="gh-repo-item">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                      <span
+                        className="gh-repo-link"
+                        onClick={() => {
+                          if (realRepo) {
+                            onOpenRepo(realRepo.id, "chat");
+                          } else {
+                            onConnectNew();
+                          }
+                        }}
+                      >
+                        {r.name}
+                      </span>
+                      <span className="gh-repo-badge">Public</span>
+                    </div>
+
+                    {r.forkedFrom && (
+                      <div className="gh-fork-info">
+                        Forked from <a href={`https://github.com/${r.forkedFrom}`} target="_blank" rel="noopener noreferrer">{r.forkedFrom}</a>
+                      </div>
+                    )}
+
+                    {r.desc && <div className="gh-repo-desc">{r.desc}</div>}
+
+                    <div className="gh-repo-meta-row">
+                      {r.language && (
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span className="gh-lang-dot" style={{ background: r.langColor || "#f1e05a" }} />
+                          <span>{r.language}</span>
+                        </div>
+                      )}
+
+                      <span>{r.updated}</span>
+
+                      {realRepo && (
+                        <span style={{ color: "var(--muted-2)", fontFamily: "var(--font-mono)" }}>
+                          {realRepo.chunkCount} chunks indexed
+                        </span>
+                      )}
+
+                      {currentUser && realRepo && realRepo.indexedByUserId === currentUser.id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteRepo(realRepo);
+                          }}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "var(--muted-2)",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            padding: 0,
+                          }}
+                          title="Delete from workspace"
+                        >
+                          delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right side: Star button & sparkline */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12, flexShrink: 0 }}>
+                    <button className="gh-star-btn" onClick={(e) => e.stopPropagation()}>
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"></path>
+                      </svg>
+                      <span>Star</span>
+                      <span style={{ fontSize: "10px", opacity: 0.7 }}>▾</span>
+                    </button>
+
+                    {/* Commit activity sparkline */}
+                    <div style={{ width: 120, height: 20 }}>
+                      <svg width="120" height="20" viewBox="0 0 120 20" fill="none">
+                        <path
+                          d={r.name.toLowerCase() === "webiu"
+                            ? "M0 16 L25 16 L50 16 L65 4 L80 16 L100 16 L120 16"
+                            : "M0 16 L30 16 L60 16 L75 16 L90 16 L105 16 L120 16"
+                          }
+                          stroke="#238636"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RepoCodeOverview({ repo, onNavigateTab }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button className="gh-filter-btn" style={{ fontSize: "13px" }}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M5 3.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm0 2.122a2.25 2.25 0 1 0-1.5 0v5.256a2.25 2.25 0 1 0 1.5 0V5.372Zm-1.5 7.378a.75.75 0 1 1 1.5 0 .75.75 0 0 1-1.5 0ZM12.5 4.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 2.122a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5Zm-1.75 3.878a2.25 2.25 0 0 0-2.25-2.25H7.5v-1.5h1a.75.75 0 0 0 0-1.5h-1V3.75a.75.75 0 0 0-1.5 0v5.5a.75.75 0 0 0 .75.75h1.75a.75.75 0 0 1 .75.75v.878a2.25 2.25 0 1 0 1.5 0ZM10.25 13a.75.75 0 1 1 1.5 0 .75.75 0 0 1-1.5 0Z"></path>
+            </svg>
+            <span>{repo.default_branch || "main"}</span>
+            <span style={{ fontSize: "10px", opacity: 0.7 }}>▾</span>
+          </button>
+          <span style={{ fontSize: "13px", color: "var(--muted)" }}>
+            <strong>1</strong> branch &bull; <strong>{repo.chunkCount}</strong> indexed chunks
+          </span>
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn btn-primary" onClick={() => onNavigateTab("chat")}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M7.998 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM1 8a7 7 0 1 1 14 0A7 7 0 0 1 1 8Z"></path>
+            </svg>
+            Ask Copilot
+          </button>
+          <button className="btn" onClick={() => onNavigateTab("dashboard")}>
+            Triage Issues
+          </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 20 }}>
+        <div style={{ padding: "12px 16px", background: "var(--surface-raised)", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontWeight: 600, fontSize: "13px" }}>@{repo.indexedBy || repo.owner}</span>
+            <span style={{ fontSize: "12px", color: "var(--muted)" }}>Indexed repository for team collaboration &amp; AI triage</span>
+          </div>
+          <span style={{ fontSize: "12px", color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
+            {repo.indexedAt ? new Date(repo.indexedAt).toLocaleDateString() : "Recently"}
+          </span>
+        </div>
+
+        <div style={{ padding: "16px 20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+            <div>
+              <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: 4 }}>EMBEDDING MODEL</div>
+              <div style={{ fontSize: "14px", fontWeight: 600 }}>text-embedding-3-small</div>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>1,536 dimensional vectors</div>
+            </div>
+            <div>
+              <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: 4 }}>SEMANTIC CHUNKS</div>
+              <div style={{ fontSize: "14px", fontWeight: 600 }}>{repo.chunkCount} code blocks</div>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>Vector indexed via pgvector</div>
+            </div>
+            <div>
+              <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: 4 }}>GROUNDING HEALTH</div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--success)" }}>86.7% accuracy</div>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>Source verified on retrieval</div>
+            </div>
+            <div>
+              <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: 4 }}>PR AUTOMATION</div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--accent)" }}>Ready</div>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>Fork-aware branch push</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: "20px" }}>
+        <h3 style={{ margin: "0 0 12px", fontSize: "15px" }}>README.md</h3>
+        <div style={{ fontSize: "14px", color: "var(--text)", lineHeight: 1.6 }}>
+          <p>
+            <strong>{repo.owner}/{repo.name}</strong> is connected to CodeSphere.
+          </p>
+          <p style={{ color: "var(--muted)" }}>
+            Use the <strong>Issues</strong> tab to scan for potential memory leaks, stale issues, and auto-generate pull requests.
+            Use <strong>Copilot</strong> to ask architecture and logic questions grounded in the actual codebase files.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={onConnectNew} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span>+ Connect repository</span>
+      </div>
+    </div>
+  );
+}
+
+function PullRequestsView({ repo, onNavigateTab }) {
+  const [prs, setPrs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/dashboard?owner=${encodeURIComponent(repo.owner)}&repo=${encodeURIComponent(repo.name)}`)
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((data) => {
+        const delivered = data.deliveredSolutions || {};
+        const list = Object.entries(delivered)
+          .filter(([_, d]) => d.pr)
+          .map(([num, d]) => ({
+            issueNumber: num,
+            ...d.pr,
+          }));
+        setPrs(list);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [repo.owner, repo.name]);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontWeight: 600, fontSize: "14px" }}>Pull requests</span>
+          <span className="gh-counter-pill">{prs.length}</span>
+        </div>
+        <button className="btn btn-primary" onClick={() => onNavigateTab("dashboard")}>
+          Create PR from issue
         </button>
       </div>
 
-      {/* Summary Metrics Strip */}
-      <div className="hub-summary-strip">
-        <div className="summary-item">
-          <span className="summary-val">{teamRepos.length}</span>
-          <span className="summary-lbl">Repositories</span>
-        </div>
-        <div className="summary-sep" />
-        <div className="summary-item">
-          <span className="summary-val">{totalChunks.toLocaleString()}</span>
-          <span className="summary-lbl">Vector Chunks</span>
-        </div>
-        <div className="summary-sep" />
-        <div className="summary-item">
-          <span className="summary-val">{assignments.length}</span>
-          <span className="summary-lbl">Assigned Tasks ({overdue.length} overdue)</span>
-        </div>
-        <div className="summary-sep" />
-        <div className="summary-item">
-          <span className="summary-val" style={{ color: "var(--success)" }}>86.7%</span>
-          <span className="summary-lbl">Grounding Rate</span>
-        </div>
-      </div>
+      {loading && <p className="empty-state">Loading pull requests...</p>}
 
-      {/* Connected Repositories Section */}
-      <div style={{ marginBottom: "2.5rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.9rem" }}>
-          <h3 className="hub-section-title" style={{ margin: 0 }}>
-            Connected Repositories ({teamRepos.length})
-          </h3>
-          {teamRepos.length > 0 && (
-            <button className="btn" style={{ fontSize: "0.78rem", padding: "0.3rem 0.65rem" }} onClick={onConnectNew}>
-              + Add repository
-            </button>
-          )}
+      {!loading && prs.length === 0 ? (
+        <div className="card" style={{ textAlign: "center", padding: "40px 20px" }}>
+          <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" style={{ color: "var(--muted)", marginBottom: 12 }}>
+            <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.25 2.25 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.5 5.396l2.323-2.323a.75.75 0 0 1 1.06 1.06L10.56 6.457l2.324 2.323a.75.75 0 0 1-1.06 1.06L9.5 7.518 7.177 9.84a.75.75 0 0 1-1.06-1.06L8.44 6.457 6.116 4.134a.75.75 0 0 1 1.06-1.06ZM3 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm0 9.5a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z"></path>
+          </svg>
+          <h4 style={{ margin: "0 0 6px" }}>No pull requests delivered yet</h4>
+          <p style={{ color: "var(--muted)", fontSize: "13px", maxWidth: 460, margin: "0 auto 16px" }}>
+            Go to the Issues tab to solve an issue with AI and click &quot;Open Pull Request on GitHub&quot; to automatically push a fix branch and open a PR.
+          </p>
+          <button className="btn btn-primary" onClick={() => onNavigateTab("dashboard")}>
+            Go to Issues &rarr;
+          </button>
         </div>
-
-        {teamRepos.length === 0 ? (
-          <div className="card" style={{ padding: "2.5rem 1.5rem", textAlign: "center", maxWidth: 540, margin: "0 auto" }}>
-            <h4 style={{ margin: "0 0 6px", fontSize: "1.05rem" }}>No repositories connected yet</h4>
-            <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginBottom: "1.2rem", lineHeight: 1.5 }}>
-              Connect a GitHub repository to begin indexing source files, asking grounded questions, and automating issue triage.
-            </p>
-            <button className="btn btn-primary" onClick={onConnectNew}>
-              Connect repository &rarr;
-            </button>
-          </div>
-        ) : (
-          <div className="hub-repo-grid">
-            {teamRepos.map((r) => (
-              <div key={r.id} className="hub-repo-card">
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          {prs.map((pr) => (
+            <div
+              key={pr.number || pr.issueNumber}
+              style={{
+                padding: "14px 18px",
+                borderBottom: "1px solid var(--border)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ color: "var(--success)", marginTop: 3 }}>
+                  <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.25 2.25 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.5 5.396l2.323-2.323a.75.75 0 0 1 1.06 1.06L10.56 6.457l2.324 2.323a.75.75 0 0 1-1.06 1.06L9.5 7.518 7.177 9.84a.75.75 0 0 1-1.06-1.06L8.44 6.457 6.116 4.134a.75.75 0 0 1 1.06-1.06ZM3 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm0 9.5a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z"></path>
+                </svg>
                 <div>
-                  <div className="hub-repo-card-header">
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                      <span className="repo-avatar">{r.name.slice(0, 2).toUpperCase()}</span>
-                      <div style={{ minWidth: 0 }}>
-                        <div className="hub-repo-title" title={`${r.owner}/${r.name}`}>
-                          {r.owner}/{r.name}
-                        </div>
-                        <div style={{ fontSize: "0.72rem", color: "var(--muted)" }}>
-                          Branch: {r.default_branch || "main"}
-                        </div>
-                      </div>
-                    </div>
+                  <div style={{ fontSize: "14px", fontWeight: 600 }}>
+                    <a href={pr.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text)", textDecoration: "none" }}>
+                      Fix for Issue #{pr.issueNumber} ({pr.branch || `fix/issue-${pr.issueNumber}`})
+                    </a>
+                    <span className="badge" style={{ marginLeft: 8, color: "var(--success)", borderColor: "var(--success)" }}>
+                      Delivered via CodeSphere
+                    </span>
                   </div>
-                  <div className="hub-repo-meta">
-                    {r.chunkCount} chunks indexed &bull; Connected by @{r.indexedBy || "team"}
+                  <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: 4 }}>
+                    #{pr.number || "PR"} &bull; target branch <code>main</code> &bull; created {new Date(pr.createdAt).toLocaleDateString()}
                   </div>
-                </div>
-
-                <div className="hub-repo-actions">
-                  <button className="hub-repo-btn primary" onClick={() => onOpenRepo(r.id, "chat")}>
-                    Code Assistant
-                  </button>
-                  <button className="hub-repo-btn" onClick={() => onOpenRepo(r.id, "dashboard")}>
-                    Backlog &amp; Health
-                  </button>
-                  <button className="hub-repo-btn" onClick={() => onOpenRepo(r.id, "assignments")}>
-                    Assignments
-                  </button>
-                  <button className="hub-repo-btn" onClick={() => onOpenRepo(r.id, "discussion")}>
-                    Discussion
-                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Task & Assignment Section */}
-      <div>
-        <h3 className="hub-section-title">
-          Assigned Tasks
-        </h3>
-
-        {loading && <p className="empty-state">Loading tasks...</p>}
-
-        {!loading && assignments.length === 0 && (
-          <div className="card" style={{ maxWidth: 520 }}>
-            <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.85rem" }}>
-              No tasks currently assigned to your account.
-            </p>
-          </div>
-        )}
-
-        {overdue.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <p className="sidebar-heading" style={{ padding: 0, color: "var(--danger)", marginBottom: 8 }}>
-              Overdue ({overdue.length})
-            </p>
-            <TaskList tasks={overdue} onMarkRead={markRead} onOpenRepo={onOpenRepo} />
-          </div>
-        )}
-
-        {upcoming.length > 0 && (
-          <div>
-            <p className="sidebar-heading" style={{ padding: 0, marginBottom: 8 }}>
-              Active ({upcoming.length})
-            </p>
-            <TaskList tasks={upcoming} onMarkRead={markRead} onOpenRepo={onOpenRepo} />
-          </div>
-        )}
-      </div>
+              {pr.url && (
+                <a href={pr.url} target="_blank" rel="noopener noreferrer" className="btn" style={{ fontSize: "12px" }}>
+                  View on GitHub &rarr;
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
