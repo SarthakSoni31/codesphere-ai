@@ -2492,7 +2492,7 @@ function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab }) {
                     <strong style={{ fontSize: "13px" }}>Run Automated Grounding Health Probe</strong>
                   </div>
                   <p style={{ margin: 0, fontSize: "12px", color: "var(--muted)", lineHeight: 1.5 }}>
-                    Executes 6 automated test queries probing core modules across this repository to test whether pgvector retrieval locates the exact source lines.
+                    Executes 20 automated test queries probing core modules across this repository to test whether pgvector retrieval locates the exact source lines.
                   </p>
                 </div>
                 <button
@@ -2501,7 +2501,7 @@ function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab }) {
                   disabled={probing}
                   style={{ fontSize: "12px", padding: "6px 14px", flexShrink: 0 }}
                 >
-                  {probing ? "Probing pgvector..." : "Run Health Check Probe (6 Tests)"}
+                  {probing ? "Probing pgvector (20 Tests)..." : "Run Health Check Probe (20 Tests)"}
                 </button>
               </div>
 

@@ -23,13 +23,24 @@ export async function POST(request, { params }) {
   }
   const repo = repoRows[0];
 
-  // Sample up to 6 distinct code chunks across diverse files in the repository
+  // Sample up to 20 distinct code chunks across diverse files, prioritizing source code
   const { rows: sampleChunks } = await db.query(
-    `SELECT DISTINCT ON (file_path) id, file_path, start_line, end_line, content
-     FROM chunks
-     WHERE repository_id = $1 AND content IS NOT NULL AND length(content) > 30
-     ORDER BY file_path, id ASC
-     LIMIT 6`,
+    `WITH distinct_files AS (
+       SELECT DISTINCT ON (file_path) id, file_path, start_line, end_line, content
+       FROM chunks
+       WHERE repository_id = $1 AND content IS NOT NULL AND length(content) > 30
+       ORDER BY file_path, id ASC
+     )
+     SELECT * FROM distinct_files
+     ORDER BY 
+       (CASE 
+          WHEN file_path ~ '\\.(tsx?|jsx?|py|go|java|rb|rs|c|cpp|php|vue|svelte)$' THEN 0 
+          WHEN file_path LIKE 'docs/%' OR file_path LIKE '%.md' THEN 2 
+          WHEN file_path LIKE '.github/%' THEN 3
+          ELSE 1 
+        END),
+       file_path ASC
+     LIMIT 20`,
     [repositoryId]
   );
 
