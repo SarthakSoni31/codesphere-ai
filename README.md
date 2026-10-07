@@ -4,8 +4,7 @@ An AI-assisted codebase understanding tool: connect a GitHub repo, ask questions
 grounded in the actual source code (with file/line citations), auto-triage new
 issues with a webhook bot, and see a live backlog-health dashboard.
 
-This implements the architecture from the project proposal (`codesphere-ai-proposal.pdf`):
-retrieval over indexed source (not model training), a GitHub OAuth-connected
+Built with retrieval over indexed source (not model training), a GitHub OAuth-connected
 website, and a webhook-driven auto-triage bot — no data duplicated out of GitHub.
 
 **This is a shared team workspace, not a per-person tool.** Any teammate can
@@ -173,13 +172,12 @@ from your bot with a summary and a suggested label.
 - **Database**: Supabase or Neon both give you Postgres + pgvector without
   managing a server yourself.
 - **CI/CD**: add a workflow that runs `npm run build` and your test suite on
-  every push, then deploys to staging — see proposal section 5.3.
+  every push, then deploys to staging.
 
 ## Notes on scope
 
-This is the first-iteration deliverable from the proposal (section 9.1):
-OAuth login, single-repo indexing, grounded chat, and the auto-triage bot,
-with CI/CD-friendly structure. Deliberately **not** built yet (see 9.2):
+Core capabilities include OAuth login, repository indexing, grounded chat, and the auto-triage bot,
+with CI/CD-friendly structure. Deliberately **not** built yet:
 incremental re-indexing on new commits (current indexing always does a full
 re-index), multi-repo/multi-team support, and a full GitHub App installation
 flow (the webhook here is a simpler per-repo webhook using the connecting
