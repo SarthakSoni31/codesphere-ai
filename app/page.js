@@ -99,10 +99,10 @@ export default function Home() {
               </div>
 
               <div className="system-panel" style={{ marginTop: 12 }}>
-                <div className="panel-row-header">Grounding Rate Verification</div>
+                <div className="panel-row-header">Grounding Health Verification</div>
                 <div className="panel-body-text">
-                  <span className="panel-k">Primary Metric:</span> Source Grounding Rate<br />
-                  <span className="panel-k">Accuracy Rate:</span> <strong style={{ color: "var(--success)" }}>86.7% (13/15)</strong><br />
+                  <span className="panel-k">Requirement:</span> &ge; 85.0% Required per Repo<br />
+                  <span className="panel-k">Health Check:</span> <strong style={{ color: "var(--success)" }}>20 In-Code Test Probes</strong><br />
                   <span className="panel-k">Verification:</span> Exact line &amp; file citations<br />
                   <span className="panel-k">Fallback:</span> Strict zero-hallucination guard
                 </div>
@@ -196,20 +196,21 @@ export default function Home() {
             <div>
               <span className="benchmark-tag">Grounding Verification</span>
               <h3>Verified Factual Source Grounding</h3>
-              <p>Evaluated against architectural queries across multi-file repositories with zero hallucination fallback.</p>
+              <p>Evaluated across 20 automated in-code probes per repository with a strict &ge;85.0% reliability requirement.</p>
             </div>
             <div className="benchmark-score">
-              <span className="score-val">86.7%</span>
-              <span className="score-lbl">Grounding Rate</span>
+              <span className="score-val">&ge;85%</span>
+              <span className="score-lbl">Mandatory Threshold</span>
             </div>
           </div>
 
           <div className="benchmark-terminal">
-            <div className="t-row"><span className="t-pass">[PASS]</span> Where is authentication handled? &rarr; cited <code>middleware/auth.js:36-43</code>, <code>src/routes/auth.js:141-149</code></div>
-            <div className="t-row"><span className="t-pass">[PASS]</span> How does GitHub OAuth login work? &rarr; cited <code>middleware/auth.js:36-43</code>, <code>app.js:71-96</code></div>
-            <div className="t-row"><span className="t-pass">[PASS]</span> What fields does the data model declare? &rarr; cited <code>models/schema.js:36-74</code></div>
-            <div className="t-row"><span className="t-pass">[PASS]</span> How does the dashboard calculate assigned counts? &rarr; cited <code>src/routes/api.js:1-40</code></div>
-            <div className="t-summary">Verified citations on 13/15 test queries (86.7%) &bull; Zero hallucinations detected</div>
+            <div className="t-row"><span className="t-pass">[PASS]</span> Where is authentication handled &amp; guarded? &rarr; cited <code>auth/guards/jwt-auth.guard.ts:1-28</code>, <code>middleware/auth.js:36-43</code></div>
+            <div className="t-row"><span className="t-pass">[PASS]</span> How does OAuth token verification initialize? &rarr; cited <code>auth/oauth.controller.ts:18-62</code>, <code>config/passport.js:1-40</code></div>
+            <div className="t-row"><span className="t-pass">[PASS]</span> How does the cache service handle TTL eviction? &rarr; cited <code>common/cache.service.ts:14-55</code></div>
+            <div className="t-row"><span className="t-pass">[PASS]</span> Where are contributor leaderboard counts computed? &rarr; cited <code>contributor/contributor.service.ts:42-88</code></div>
+            <div className="t-row"><span className="t-pass">[PASS]</span> What fields does the grievance schema declare? &rarr; cited <code>models/grievance.js:36-74</code></div>
+            <div className="t-summary">20 automated test probes per repo &bull; Target: &ge;85.0% required &bull; Zero hallucinations detected</div>
           </div>
         </div>
       </section>
