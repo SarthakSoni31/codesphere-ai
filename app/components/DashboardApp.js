@@ -1119,7 +1119,7 @@ function StaleIssueRow({ issue, repo }) {
                       )}
                       {prSuccess && (
                         <span style={{ fontSize: "0.78rem", color: "var(--success)" }}>
-                          ✓ PR #{prSuccess.number} opened on GitHub —{" "}
+                          ✓ PR #{prSuccess.number} opened on GitHub{prSuccess.isFork && prSuccess.forkOwner ? ` (via fork ${prSuccess.forkOwner}/${repo.name})` : ""} —{" "}
                           <a
                             href={prSuccess.url}
                             target="_blank"
