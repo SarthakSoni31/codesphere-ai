@@ -12,6 +12,7 @@ export default function DashboardApp() {
 
   const [currentUser, setCurrentUser] = useState(null); // { id, login }
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedGroundingRepo, setSelectedGroundingRepo] = useState(null);
 
   const fetchTeamRepos = useCallback(async () => {
     setLoadingTeamRepos(true);
@@ -99,6 +100,7 @@ export default function DashboardApp() {
           }}
           onConnectNew={() => setShowConnectForm(true)}
           onDeleteRepo={deleteRepo}
+          onOpenGroundingModal={(r) => setSelectedGroundingRepo(r)}
         />
       )}
 
@@ -130,6 +132,29 @@ export default function DashboardApp() {
                   style={{ fontSize: "12px", padding: "4px 10px" }}
                 >
                   &larr; Repositories
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => setSelectedGroundingRepo(selectedRepo)}
+                  style={{
+                    fontSize: "12px",
+                    padding: "4px 10px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    borderColor: (selectedRepo.groundingRate !== null && selectedRepo.groundingRate >= 85) ? "rgba(46, 160, 67, 0.4)" : "rgba(210, 153, 34, 0.4)",
+                    color: (selectedRepo.groundingRate !== null && selectedRepo.groundingRate >= 85) ? "var(--success)" : "var(--warning)",
+                    background: (selectedRepo.groundingRate !== null && selectedRepo.groundingRate >= 85) ? "rgba(35, 134, 54, 0.1)" : "rgba(210, 153, 34, 0.1)",
+                    fontWeight: 600,
+                  }}
+                  title="Grounding health & verification"
+                >
+                  <span style={{ fontSize: "11px" }}>
+                    {selectedRepo.groundingRate !== null && selectedRepo.groundingRate >= 85 ? "✓" : "⚠"}
+                  </span>
+                  <span>
+                    Grounding: {selectedRepo.groundingRate !== null ? `${selectedRepo.groundingRate}%` : "Unverified"}
+                  </span>
                 </button>
                 <button className="gh-filter-btn" style={{ fontSize: "12px" }}>
                   Watch ▾
@@ -234,21 +259,81 @@ export default function DashboardApp() {
 
           {/* Repo Workspace Content */}
           <div className="gh-repo-content-container">
-            {view === "code" && <RepoCodeOverview repo={selectedRepo} onNavigateTab={setView} />}
+            {(selectedRepo.groundingRate === null || selectedRepo.groundingRate < 85) && (
+              <div
+                style={{
+                  background: "rgba(210, 153, 34, 0.08)",
+                  border: "1px solid rgba(210, 153, 34, 0.35)",
+                  borderRadius: 6,
+                  padding: "12px 16px",
+                  marginBottom: 16,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 16,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: "16px" }}>⚠️</span>
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--warning)" }}>
+                      Grounding Target Alert: {selectedRepo.groundingRate !== null ? `${selectedRepo.groundingRate}%` : "Unverified"} (Required: ≥85.0%)
+                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: 2 }}>
+                      This repository requires a verified grounding rate over 85% to ensure Copilot answers and issue triage bots cite actual lines without hallucination.
+                    </div>
+                  </div>
+                </div>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setSelectedGroundingRepo(selectedRepo)}
+                  style={{ fontSize: "12px", padding: "5px 12px" }}
+                >
+                  Follow Optimization Steps &rarr;
+                </button>
+              </div>
+            )}
+
+            {view === "code" && (
+              <RepoCodeOverview
+                repo={selectedRepo}
+                onNavigateTab={setView}
+                onOpenGroundingModal={() => setSelectedGroundingRepo(selectedRepo)}
+              />
+            )}
             {(view === "dashboard" || view === "issues") && <DashboardView repo={selectedRepo} />}
             {view === "pulls" && <PullRequestsView repo={selectedRepo} onNavigateTab={setView} />}
-            {view === "chat" && <ChatView repo={selectedRepo} />}
+            {view === "chat" && <ChatView repo={selectedRepo} onRepoUpdated={fetchTeamRepos} />}
             {view === "team" && <TeamView repo={selectedRepo} />}
             {view === "discussion" && <DiscussionView repo={selectedRepo} />}
             {view === "assignments" && <AssignmentsView repo={selectedRepo} currentUser={currentUser} />}
           </div>
         </div>
       )}
+
+      {selectedGroundingRepo && (
+        <GroundingHealthModal
+          repo={selectedGroundingRepo}
+          onClose={() => setSelectedGroundingRepo(null)}
+          onRepoUpdated={async () => {
+            const repos = await fetchTeamRepos();
+            if (selectedRepo) {
+              const fresh = repos.find((r) => r.id === selectedRepo.id);
+              if (fresh) setSelectedRepo(fresh);
+            }
+          }}
+          onNavigateTab={(tab) => {
+            selectRepo(selectedGroundingRepo, tab);
+            setSelectedGroundingRepo(null);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDeleteRepo }) {
+function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDeleteRepo, onOpenGroundingModal }) {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState("");
@@ -279,6 +364,10 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDel
   const overdue = assignments.filter((a) => a.deadline && new Date(a.deadline) < new Date() && !a.isRead);
   const upcoming = assignments.filter((a) => !overdue.includes(a));
   const totalChunks = teamRepos.reduce((acc, r) => acc + (Number(r.chunkCount) || 0), 0);
+  const totalQueriesAll = teamRepos.reduce((acc, r) => acc + (Number(r.totalQueries) || 0), 0);
+  const groundedQueriesAll = teamRepos.reduce((acc, r) => acc + (Number(r.groundedQueries) || 0), 0);
+  const overallGroundingRate = totalQueriesAll > 0 ? Number(((groundedQueriesAll / totalQueriesAll) * 100).toFixed(1)) : null;
+  const compliantRepos = teamRepos.filter((r) => r.groundingRate !== null && r.groundingRate >= 85.0);
 
   const filteredRepos = teamRepos.filter((r) => {
     if (!searchFilter) return true;
@@ -351,8 +440,13 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDel
           </div>
           <div style={{ width: 1, height: 28, background: "var(--border)" }} />
           <div>
-            <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Grounding Rate</div>
-            <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--success)" }}>86.7%</div>
+            <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Grounding Health (≥85% Target)</div>
+            <div style={{ fontSize: "18px", fontWeight: 600, color: compliantRepos.length === teamRepos.length && teamRepos.length > 0 ? "var(--success)" : "var(--warning)" }}>
+              {compliantRepos.length}/{teamRepos.length} Met
+              <span style={{ fontSize: "11px", fontWeight: 400, marginLeft: 6, color: "var(--muted)" }}>
+                ({overallGroundingRate !== null ? `${overallGroundingRate}% avg` : "pending"})
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -448,10 +542,72 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDel
                       {r.indexedAt && (
                         <span>{new Date(r.indexedAt).toLocaleDateString()}</span>
                       )}
+                      {r.groundingRate !== null ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onOpenGroundingModal) onOpenGroundingModal(r);
+                          }}
+                          style={{
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                            padding: "2px 8px",
+                            borderRadius: 12,
+                            fontWeight: 600,
+                            fontSize: "11px",
+                            background: r.groundingRate >= 85 ? "rgba(35, 134, 54, 0.15)" : "rgba(248, 81, 73, 0.15)",
+                            color: r.groundingRate >= 85 ? "var(--success)" : "var(--danger)",
+                            border: `1px solid ${r.groundingRate >= 85 ? "rgba(46, 160, 67, 0.4)" : "rgba(248, 81, 73, 0.4)"}`,
+                          }}
+                          title="Click to view grounding verification and remediation steps"
+                        >
+                          <span>{r.groundingRate >= 85 ? "✓" : "⚠"}</span>
+                          <span>{r.groundingRate}% Grounded {r.groundingRate >= 85 ? "(≥85% Met)" : "(Action Required)"}</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onOpenGroundingModal) onOpenGroundingModal(r);
+                          }}
+                          style={{
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                            padding: "2px 8px",
+                            borderRadius: 12,
+                            fontWeight: 600,
+                            fontSize: "11px",
+                            background: "rgba(210, 153, 34, 0.15)",
+                            color: "var(--warning)",
+                            border: "1px solid rgba(210, 153, 34, 0.4)",
+                          }}
+                          title="Click to run automated grounding health check"
+                        >
+                          <span>⚡</span>
+                          <span>Unverified (Run Health Check)</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <button
+                      className="btn"
+                      onClick={() => onOpenGroundingModal && onOpenGroundingModal(r)}
+                      style={{
+                        fontSize: "12px",
+                        padding: "4px 10px",
+                        color: (r.groundingRate !== null && r.groundingRate >= 85) ? "var(--text)" : "var(--warning)",
+                        borderColor: (r.groundingRate !== null && r.groundingRate >= 85) ? "var(--border)" : "var(--warning)",
+                      }}
+                      title="Inspect grounding score or follow optimization steps"
+                    >
+                      Grounding Health
+                    </button>
                     <button className="btn btn-primary" onClick={() => onOpenRepo(r.id, "chat")} style={{ fontSize: "12px", padding: "4px 10px" }}>
                       Assistant
                     </button>
@@ -519,7 +675,7 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDel
   );
 }
 
-function RepoCodeOverview({ repo, onNavigateTab }) {
+function RepoCodeOverview({ repo, onNavigateTab, onOpenGroundingModal }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
@@ -564,8 +720,8 @@ function RepoCodeOverview({ repo, onNavigateTab }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
             <div>
               <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: 4 }}>EMBEDDING MODEL</div>
-              <div style={{ fontSize: "14px", fontWeight: 600 }}>text-embedding-3-small</div>
-              <div style={{ fontSize: "12px", color: "var(--muted)" }}>1,536 dimensional vectors</div>
+              <div style={{ fontSize: "14px", fontWeight: 600 }}>all-MiniLM-L6-v2 (ONNX)</div>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>384 dimensional local vectors</div>
             </div>
             <div>
               <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: 4 }}>SEMANTIC CHUNKS</div>
@@ -574,8 +730,18 @@ function RepoCodeOverview({ repo, onNavigateTab }) {
             </div>
             <div>
               <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: 4 }}>GROUNDING HEALTH</div>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--success)" }}>86.7% accuracy</div>
-              <div style={{ fontSize: "12px", color: "var(--muted)" }}>Source verified on retrieval</div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: (repo.groundingRate !== null && repo.groundingRate >= 85) ? "var(--success)" : "var(--warning)" }}>
+                {repo.groundingRate !== null ? `${repo.groundingRate}% accuracy` : "Unverified"}
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                {repo.groundingRate !== null && repo.groundingRate >= 85 ? "Target met (≥85%)" : "Target: ≥85.0% required"} &bull;{" "}
+                <button
+                  onClick={() => onOpenGroundingModal && onOpenGroundingModal(repo)}
+                  style={{ background: "none", border: "none", padding: 0, color: "var(--accent)", cursor: "pointer", textDecoration: "underline", fontSize: "12px" }}
+                >
+                  {repo.groundingRate !== null && repo.groundingRate >= 85 ? "View report" : "Follow steps"}
+                </button>
+              </div>
             </div>
             <div>
               <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: 4 }}>PR AUTOMATION</div>
@@ -873,7 +1039,7 @@ function ConnectRepoView({ onIndexed, onCancel }) {
   );
 }
 
-function ChatView({ repo }) {
+function ChatView({ repo, onRepoUpdated }) {
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
@@ -908,6 +1074,7 @@ function ChatView({ repo }) {
         ...h,
         { question: askedQuestion, answer: data.answer || `Error: ${data.error}`, sources: data.sources },
       ]);
+      if (onRepoUpdated) onRepoUpdated();
     } catch (err) {
       setChatHistory((h) => [...h, { question: askedQuestion, answer: `Error: ${err.message}`, sources: [] }]);
     } finally {
@@ -2138,6 +2305,316 @@ function AssignmentsView({ repo, currentUser }) {
             )}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab }) {
+  const [currentRepo, setCurrentRepo] = useState(repo);
+  const [probing, setProbing] = useState(false);
+  const [probeResults, setProbeResults] = useState(null);
+  const [probeSummary, setProbeSummary] = useState(null);
+  const [probeError, setProbeError] = useState(null);
+
+  const [reindexing, setReindexing] = useState(false);
+  const [reindexMsg, setReindexMsg] = useState(null);
+
+  const rate = currentRepo.groundingRate;
+  const targetMet = rate !== null && rate >= 85.0;
+
+  async function runProbe() {
+    setProbing(true);
+    setProbeError(null);
+    setProbeResults(null);
+    try {
+      const res = await fetch(`/api/repositories/${currentRepo.id}/probe`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setProbeError(data.error || "Failed to execute grounding probe.");
+        return;
+      }
+      setProbeResults(data.results || []);
+      setProbeSummary({
+        total: data.totalProbes,
+        passed: data.passedProbes,
+        rate: data.probeGroundingRate,
+        overall: data.overallGroundingRate,
+        targetMet: data.targetMet,
+      });
+
+      setCurrentRepo((prev) => ({
+        ...prev,
+        groundingRate: data.overallGroundingRate,
+        groundedQueries: data.groundedQueries,
+        totalQueries: data.totalQueries,
+        targetMet: data.targetMet,
+        groundingStatus: data.targetMet ? "healthy" : "failing",
+      }));
+
+      if (onRepoUpdated) onRepoUpdated();
+    } catch (err) {
+      setProbeError(err.message || "Failed to execute probe.");
+    } finally {
+      setProbing(false);
+    }
+  }
+
+  async function runReindex() {
+    setReindexing(true);
+    setReindexMsg(null);
+    try {
+      const res = await fetch("/api/index-repo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ owner: currentRepo.owner, repo: currentRepo.name }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setReindexMsg(`Re-indexing failed: ${data.error || "Unknown error"}`);
+        return;
+      }
+      setReindexMsg(`Successfully re-indexed ${data.chunksIndexed} chunks across ${data.filesIndexed} files.`);
+      setCurrentRepo((prev) => ({ ...prev, chunkCount: data.chunksIndexed }));
+      if (onRepoUpdated) onRepoUpdated();
+    } catch (err) {
+      setReindexMsg(`Re-indexing error: ${err.message}`);
+    } finally {
+      setReindexing(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+        {/* Modal Header */}
+        <div
+          style={{
+            padding: "16px 20px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            background: "var(--surface-raised)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: "18px" }}>🎯</span>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 600 }}>Grounding Health &amp; Verification</h3>
+              <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                {currentRepo.owner}/{currentRepo.name} &bull; Target: &ge;85.0% Required
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} className="btn" style={{ padding: "4px 8px", fontSize: "12px" }}>
+            ✕
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div style={{ padding: "20px", overflowY: "auto", maxHeight: "calc(90vh - 120px)" }}>
+          {/* Status Gauge Card */}
+          <div
+            className="card"
+            style={{
+              padding: "16px",
+              marginBottom: 20,
+              background: targetMet ? "rgba(35, 134, 54, 0.08)" : "rgba(210, 153, 34, 0.08)",
+              border: `1px solid ${targetMet ? "rgba(46, 160, 67, 0.35)" : "rgba(210, 153, 34, 0.35)"}`,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+              <div>
+                <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)" }}>
+                  Current Reliability Status
+                </span>
+                <div style={{ fontSize: "18px", fontWeight: 700, color: targetMet ? "var(--success)" : "var(--warning)", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>{rate !== null ? `${rate}% Grounding Rate` : "Unverified"}</span>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      padding: "2px 8px",
+                      borderRadius: 12,
+                      background: targetMet ? "rgba(35, 134, 54, 0.2)" : "rgba(210, 153, 34, 0.2)",
+                    }}
+                  >
+                    {targetMet ? "✓ Target Met (≥85.0%)" : "⚠ Below 85.0% Target"}
+                  </span>
+                </div>
+              </div>
+              <div style={{ textAlign: "right", fontSize: "12px", color: "var(--muted)" }}>
+                <div><strong>{currentRepo.groundedQueries || 0}</strong> of <strong>{currentRepo.totalQueries || 0}</strong> queries grounded</div>
+                <div><strong>{currentRepo.chunkCount || 0}</strong> vector chunks in pgvector</div>
+              </div>
+            </div>
+
+            {/* Visual Progress Bar with 85% marker */}
+            <div style={{ position: "relative", marginBottom: 8 }}>
+              <div className="grounding-progress-track">
+                <div
+                  className="grounding-progress-fill"
+                  style={{
+                    width: `${Math.min(100, Math.max(0, rate || 0))}%`,
+                    background: targetMet ? "var(--success)" : "var(--warning)",
+                  }}
+                />
+                <div className="grounding-target-marker" title="85.0% Engineering Threshold" />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--muted)", marginTop: 4 }}>
+                <span>0%</span>
+                <span style={{ position: "absolute", left: "85%", transform: "translateX(-50%)", color: "#f0f6fc", fontWeight: 600 }}>
+                  85% Target
+                </span>
+                <span>100%</span>
+              </div>
+            </div>
+
+            <p style={{ margin: "10px 0 0", fontSize: "12px", color: "var(--text)", lineHeight: 1.5 }}>
+              {targetMet
+                ? "This repository satisfies the verified source grounding standard. AI Copilot answers and auto-triage issue comments cite exact file paths and line ranges with zero hallucinations."
+                : "This repository does not meet the required 85.0% threshold. Without verified source grounding, LLM answers risk hallucinating phantom functions or files. Follow the 4 steps below to optimize and verify grounding."}
+            </p>
+          </div>
+
+          {/* 4-Step Remediation Plan */}
+          <h4 style={{ fontSize: "13px", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>
+            Steps to Achieve &amp; Maintain &ge;85.0% Grounding
+          </h4>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Step 1 */}
+            <div className="card" style={{ padding: "14px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 260 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span className="badge" style={{ background: "var(--accent-wash)", color: "var(--accent)" }}>Step 1</span>
+                    <strong style={{ fontSize: "13px" }}>Run Automated Grounding Health Probe</strong>
+                  </div>
+                  <p style={{ margin: 0, fontSize: "12px", color: "var(--muted)", lineHeight: 1.5 }}>
+                    Executes 6 automated test queries probing core modules across this repository to test whether pgvector retrieval locates the exact source lines.
+                  </p>
+                </div>
+                <button
+                  className="btn btn-primary"
+                  onClick={runProbe}
+                  disabled={probing}
+                  style={{ fontSize: "12px", padding: "6px 14px", flexShrink: 0 }}
+                >
+                  {probing ? "Probing pgvector..." : "Run Health Check Probe (6 Tests)"}
+                </button>
+              </div>
+
+              {probeError && (
+                <div style={{ marginTop: 10, fontSize: "12px", color: "var(--danger)" }}>
+                  {probeError}
+                </div>
+              )}
+
+              {probeSummary && (
+                <div style={{ marginTop: 12, padding: "10px 12px", background: "var(--surface-raised)", borderRadius: 6, fontSize: "12px" }}>
+                  <div style={{ fontWeight: 600, color: probeSummary.targetMet ? "var(--success)" : "var(--warning)", marginBottom: 6 }}>
+                    Probe Results: {probeSummary.passed}/{probeSummary.total} Passed ({probeSummary.rate}%) &bull; Overall Repo Grounding: {probeSummary.overall}%
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {probeResults.map((pr, idx) => (
+                      <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "11px", fontFamily: "var(--font-mono)" }}>
+                        <span style={{ color: pr.passed ? "var(--success)" : "var(--danger)", fontWeight: 700 }}>
+                          [{pr.passed ? "PASS" : "FAIL"}]
+                        </span>
+                        <span style={{ color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {pr.filePath} &rarr; symbol: {pr.symbol}
+                        </span>
+                        {pr.sources.length > 0 && (
+                          <span style={{ color: "var(--muted)" }}>{pr.sources[0]}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Step 2 */}
+            <div className="card" style={{ padding: "14px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 260 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span className="badge" style={{ background: "var(--accent-wash)", color: "var(--accent)" }}>Step 2</span>
+                    <strong style={{ fontSize: "13px" }}>Re-Sync &amp; Re-Index Embeddings</strong>
+                  </div>
+                  <p style={{ margin: 0, fontSize: "12px", color: "var(--muted)", lineHeight: 1.5 }}>
+                    If code was refactored or files were deleted on GitHub, vector embeddings drift out of alignment. Re-indexing refreshes all code chunks in pgvector.
+                  </p>
+                </div>
+                <button
+                  className="btn"
+                  onClick={runReindex}
+                  disabled={reindexing}
+                  style={{ fontSize: "12px", padding: "6px 14px", flexShrink: 0 }}
+                >
+                  {reindexing ? "Indexing..." : "Re-Index Repository"}
+                </button>
+              </div>
+
+              {reindexMsg && (
+                <div style={{ marginTop: 10, fontSize: "12px", color: "var(--accent)" }}>
+                  {reindexMsg}
+                </div>
+              )}
+            </div>
+
+            {/* Step 3 */}
+            <div className="card" style={{ padding: "14px 16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span className="badge" style={{ background: "var(--accent-wash)", color: "var(--accent)" }}>Step 3</span>
+                <strong style={{ fontSize: "13px" }}>Audit Syntax Boundaries &amp; Indexable Extensions</strong>
+              </div>
+              <p style={{ margin: "0 0 8px", fontSize: "12px", color: "var(--muted)", lineHeight: 1.5 }}>
+                CodeSphere segments functions at AST boundaries. Ensure critical business logic, routes, and database models use supported languages (`.js`, `.jsx`, `.ts`, `.tsx`, `.py`, `.go`, `.rb`, `.java`). Avoid committing large minified bundles (&gt;500KB) into indexed folders.
+              </p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: "11px", color: "var(--muted)" }}>
+                <span style={{ padding: "2px 6px", background: "var(--surface-raised)", borderRadius: 4 }}>✓ AST chunking: active</span>
+                <span style={{ padding: "2px 6px", background: "var(--surface-raised)", borderRadius: 4 }}>✓ 400 file cap</span>
+                <span style={{ padding: "2px 6px", background: "var(--surface-raised)", borderRadius: 4 }}>✓ 2,000 chunk budget</span>
+              </div>
+            </div>
+
+            {/* Step 4 */}
+            <div className="card" style={{ padding: "14px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 260 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span className="badge" style={{ background: "var(--accent-wash)", color: "var(--accent)" }}>Step 4</span>
+                    <strong style={{ fontSize: "13px" }}>Execute Grounded In-Code Q&amp;A</strong>
+                  </div>
+                  <p style={{ margin: 0, fontSize: "12px", color: "var(--muted)", lineHeight: 1.5 }}>
+                    Ask specific architectural questions referencing concrete modules and symbols. Every answer that successfully grounds its claims with source citations raises your live score.
+                  </p>
+                </div>
+                {onNavigateTab && (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      onClose();
+                      onNavigateTab("chat");
+                    }}
+                    style={{ fontSize: "12px", padding: "6px 14px", flexShrink: 0 }}
+                  >
+                    Open Copilot &rarr;
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", background: "var(--surface-raised)" }}>
+          <button className="btn btn-primary" onClick={onClose} style={{ fontSize: "12px" }}>
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );
