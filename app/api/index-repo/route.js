@@ -9,8 +9,8 @@ export const maxDuration = 60;
 
 // Caps keep indexing snappy, responsive, and well within serverless execution limits.
 // Non-indexed files remain fully accessible through Just-In-Time (JIT) on-demand retrieval.
-const MAX_FILES = 45;
-const MAX_CHUNKS = 150;
+const MAX_FILES = 80;
+const MAX_CHUNKS = 350;
 const DOWNLOAD_CONCURRENCY = 15;
 const DB_BATCH_SIZE = 25;
 
