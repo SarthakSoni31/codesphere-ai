@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getDb, getSessionUser } from "../../../../../lib/db";
 import { findRelevantChunks } from "../../../../../lib/retrieval";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 export async function POST(request, { params }) {
   const user = await getSessionUser(request);
   if (!user) {

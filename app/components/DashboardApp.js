@@ -926,14 +926,14 @@ function ConnectRepoView({ onIndexed, onCancel }) {
   async function connectAndIndex() {
     setIndexing(true);
     setResult(null);
-    setStatus("Indexing repository... this can take a minute.");
+    setStatus("Connecting repository and indexing core source files...");
     try {
       const res = await fetch("/api/index-repo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ owner, repo }),
+        body: JSON.stringify({ owner: owner.trim(), repo: repo.trim() }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok && data.repositoryId) {
         setStatus("");
         setResult(data);
@@ -941,7 +941,11 @@ function ConnectRepoView({ onIndexed, onCancel }) {
         setStatus(`Error: ${data.error || "indexing failed"}`);
       }
     } catch (err) {
-      setStatus(`Error: ${err.message}`);
+      if (err.name === "AbortError" || err.message?.includes("Load failed") || err.message?.includes("Failed to fetch")) {
+        setStatus("Error: Connection interrupted or timed out. Please check network and retry.");
+      } else {
+        setStatus(`Error: ${err.message}`);
+      }
     } finally {
       setIndexing(false);
     }
@@ -1009,7 +1013,7 @@ function ConnectRepoView({ onIndexed, onCancel }) {
                   {skipped.overFileCap > 0 && (
                     <div>
                       <p style={{ fontSize: "0.78rem", color: "var(--muted)", margin: "0 0 4px" }}>
-                        {skipped.overFileCap} eligible files didn&apos;t fit under the {400}-file cap for one index run:
+                        {skipped.overFileCap} secondary files deferred (available on-demand via Just-In-Time retrieval):
                       </p>
                       {skipped.overFileCapSample.map((p) => (
                         <p key={p} className="mono" style={{ fontSize: "0.72rem", color: "var(--muted-2)", margin: "2px 0" }}>

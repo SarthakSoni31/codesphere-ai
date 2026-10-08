@@ -3,6 +3,9 @@ import { getDb, getSessionUser } from "../../../lib/db";
 import { findRelevantChunks } from "../../../lib/retrieval";
 import { generateIssueSolution } from "../../../lib/llm";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 export async function POST(request) {
   const user = await getSessionUser(request);
   if (!user) {

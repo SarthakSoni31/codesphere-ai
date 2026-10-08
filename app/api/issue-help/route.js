@@ -3,6 +3,9 @@ import { getDb, getSessionUser } from "../../../lib/db";
 import { findRelevantChunks } from "../../../lib/retrieval";
 import { generateGroundedAnswer } from "../../../lib/llm";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 const TOP_K = 6;
 
 // Same idea as the webhook bot's "Where to look" section, but callable

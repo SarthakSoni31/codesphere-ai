@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getDb, getSessionUser } from "../../../lib/db";
 import { generateBugScan } from "../../../lib/llm";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 // Depth over breadth: reviewing the FULL content of fewer files finds real
 // logical bugs far better than a single truncated chunk from many files —
 // a bug in the middle of a 200-line route handler is invisible if the scan
