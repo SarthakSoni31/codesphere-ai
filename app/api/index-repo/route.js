@@ -152,11 +152,12 @@ export async function POST(request) {
       return NextResponse.json({ error: "Not signed in" }, { status: 401 });
     }
 
-    const { owner, repo } = await request.json();
+    const { owner, repo, mode = "initial", append = false } = await request.json();
     if (!owner || !repo) {
       return NextResponse.json({ error: "owner and repo are required" }, { status: 400 });
     }
 
+    const isDeepAppend = append === true || mode === "deep";
     const db = getDb();
     const repoInfo = await getRepo(user.access_token, owner, repo);
     const branch = repoInfo.default_branch;
@@ -164,6 +165,23 @@ export async function POST(request) {
     const tree = await getRepoTree(user.access_token, owner, repo, branch);
     const allBlobEntries = tree; // every file in the repo, before any filtering
     const eligible = allBlobEntries.filter((entry) => isIndexableFile(entry.path, entry.size));
+
+    // Upsert the repository row
+    const { rows: repoRows } = await db.query(
+      `INSERT INTO repositories (owner, name, user_id, default_branch)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (owner, name) DO UPDATE SET default_branch = $4, user_id = $3
+       RETURNING id`,
+      [owner, repo, user.id, branch]
+    );
+    const repositoryId = repoRows[0].id;
+
+    // Check existing files in DB if doing deep index
+    const { rows: existingRows } = await db.query(
+      `SELECT DISTINCT file_path FROM chunks WHERE repository_id = $1`,
+      [repositoryId]
+    );
+    const existingFilePaths = new Set(existingRows.map((r) => r.file_path));
 
     // Sort eligible files by architectural importance and shallowest depth
     const sortedEligible = [...eligible].sort((a, b) => {
@@ -176,22 +194,36 @@ export async function POST(request) {
       return a.path.localeCompare(b.path);
     });
 
-    const filesToIndex = sortedEligible.slice(0, MAX_FILES);
+    // In deep append mode, filter out already indexed files to process the next batch
+    const candidateFiles = isDeepAppend
+      ? sortedEligible.filter((entry) => !existingFilePaths.has(entry.path))
+      : sortedEligible;
+
+    if (isDeepAppend && candidateFiles.length === 0) {
+      const { rows: countRows } = await db.query(
+        `SELECT COUNT(id) AS total_chunks, COUNT(DISTINCT file_path) AS total_files FROM chunks WHERE repository_id = $1`,
+        [repositoryId]
+      );
+      return NextResponse.json({
+        repositoryId,
+        filesIndexed: 0,
+        chunksIndexed: 0,
+        totalChunks: Number(countRows[0].total_chunks),
+        totalFiles: Number(countRows[0].total_files),
+        totalEligibleFiles: eligible.length,
+        remainingUnindexedFiles: 0,
+        isFullyIndexed: true,
+        isDeepAppend: true,
+        message: "All eligible files in this repository are already indexed!",
+      });
+    }
+
+    const filesToIndex = candidateFiles.slice(0, MAX_FILES);
 
     const skippedUnsupported = allBlobEntries
       .filter((entry) => !isIndexableFile(entry.path, entry.size))
       .map((entry) => entry.path);
-    const skippedOverFileCap = sortedEligible.slice(MAX_FILES).map((entry) => entry.path);
-
-    // Upsert the repository row
-    const { rows: repoRows } = await db.query(
-      `INSERT INTO repositories (owner, name, user_id, default_branch)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (owner, name) DO UPDATE SET default_branch = $4, user_id = $3
-       RETURNING id`,
-      [owner, repo, user.id, branch]
-    );
-    const repositoryId = repoRows[0].id;
+    const skippedOverFileCap = candidateFiles.slice(MAX_FILES).map((entry) => entry.path);
 
     // Concurrently fetch files from GitHub in batched workers
     const fetchedFiles = await fetchFilesConcurrently(
@@ -222,13 +254,15 @@ export async function POST(request) {
       if (hitChunkCap) break;
     }
 
-    // Re-indexing replaces old chunks wholesale
-    await db.query(`DELETE FROM chunks WHERE repository_id = $1`, [repositoryId]);
+    // If fresh indexing / full re-index, wipe existing chunks
+    if (!isDeepAppend) {
+      await db.query(`DELETE FROM chunks WHERE repository_id = $1`, [repositoryId]);
+    }
 
     if (allChunks.length > 0) {
-      // Embed chunks with file path context (capped at 1000 chars for rapid inference, full text stored in DB)
+      // Embed chunks with file path context (capped at 800 chars for rapid inference, full text stored in DB)
       const embeddings = await embedTexts(
-        allChunks.map((c) => `File: ${c.filePath}\n\n${c.text.slice(0, 1000)}`)
+        allChunks.map((c) => `File: ${c.filePath}\n\n${c.text.slice(0, 800)}`)
       );
       // Batch insert into Postgres
       await insertChunksBatch(db, repositoryId, allChunks, embeddings, DB_BATCH_SIZE);
@@ -236,10 +270,26 @@ export async function POST(request) {
 
     await db.query(`UPDATE repositories SET indexed_at = now() WHERE id = $1`, [repositoryId]);
 
+    // Compute updated total statistics
+    const { rows: updatedStats } = await db.query(
+      `SELECT COUNT(id) AS total_chunks, COUNT(DISTINCT file_path) AS total_files FROM chunks WHERE repository_id = $1`,
+      [repositoryId]
+    );
+    const totalChunks = Number(updatedStats[0].total_chunks);
+    const totalFiles = Number(updatedStats[0].total_files);
+    const remainingUnindexedFiles = Math.max(0, eligible.length - totalFiles);
+    const isFullyIndexed = remainingUnindexedFiles === 0;
+
     return NextResponse.json({
       repositoryId,
       filesIndexed,
       chunksIndexed: allChunks.length,
+      totalChunks,
+      totalFiles,
+      totalEligibleFiles: eligible.length,
+      remainingUnindexedFiles,
+      isFullyIndexed,
+      isDeepAppend,
       skipped: {
         unsupportedType: skippedUnsupported.length,
         unsupportedSample: skippedUnsupported.slice(0, 30),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 
 export default function DashboardApp() {
@@ -13,6 +13,7 @@ export default function DashboardApp() {
   const [currentUser, setCurrentUser] = useState(null); // { id, login }
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGroundingRepo, setSelectedGroundingRepo] = useState(null);
+  const [selectedDeepIndexRepo, setSelectedDeepIndexRepo] = useState(null);
 
   const fetchTeamRepos = useCallback(async () => {
     setLoadingTeamRepos(true);
@@ -101,6 +102,7 @@ export default function DashboardApp() {
           onConnectNew={() => setShowConnectForm(true)}
           onDeleteRepo={deleteRepo}
           onOpenGroundingModal={(r) => setSelectedGroundingRepo(r)}
+          onOpenDeepIndexModal={(r) => setSelectedDeepIndexRepo(r)}
         />
       )}
 
@@ -132,6 +134,22 @@ export default function DashboardApp() {
                   style={{ fontSize: "12px", padding: "4px 10px" }}
                 >
                   &larr; Repositories
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => setSelectedDeepIndexRepo(selectedRepo)}
+                  style={{
+                    fontSize: "12px",
+                    padding: "4px 10px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontWeight: 600,
+                  }}
+                  title="Multi-pass progressive Deep Index for large codebases"
+                >
+                  <span style={{ fontSize: "12px" }}>⚡</span>
+                  <span>Deep Index ({selectedRepo.chunkCount || 0})</span>
                 </button>
                 <button
                   className="btn"
@@ -300,6 +318,7 @@ export default function DashboardApp() {
                 repo={selectedRepo}
                 onNavigateTab={setView}
                 onOpenGroundingModal={() => setSelectedGroundingRepo(selectedRepo)}
+                onOpenDeepIndexModal={() => setSelectedDeepIndexRepo(selectedRepo)}
               />
             )}
             {(view === "dashboard" || view === "issues") && <DashboardView repo={selectedRepo} />}
@@ -327,13 +346,29 @@ export default function DashboardApp() {
             selectRepo(selectedGroundingRepo, tab);
             setSelectedGroundingRepo(null);
           }}
+          onOpenDeepIndexModal={(r) => setSelectedDeepIndexRepo(r)}
+        />
+      )}
+
+      {selectedDeepIndexRepo && (
+        <DeepIndexModal
+          repo={selectedDeepIndexRepo}
+          onClose={() => setSelectedDeepIndexRepo(null)}
+          onRepoUpdated={async () => {
+            const repos = await fetchTeamRepos();
+            if (selectedRepo) {
+              const fresh = repos.find((r) => r.id === selectedRepo.id);
+              if (fresh) setSelectedRepo(fresh);
+            }
+          }}
+          onOpenGroundingModal={(r) => setSelectedGroundingRepo(r)}
         />
       )}
     </div>
   );
 }
 
-function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDeleteRepo, onOpenGroundingModal }) {
+function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDeleteRepo, onOpenGroundingModal, onOpenDeepIndexModal }) {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState("");
@@ -597,6 +632,21 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDel
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                     <button
                       className="btn"
+                      onClick={() => onOpenDeepIndexModal && onOpenDeepIndexModal(r)}
+                      style={{
+                        fontSize: "12px",
+                        padding: "4px 10px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                      title="Progressively deep-index code files without serverless timeouts"
+                    >
+                      <span>⚡</span>
+                      <span>Deep Index</span>
+                    </button>
+                    <button
+                      className="btn"
                       onClick={() => onOpenGroundingModal && onOpenGroundingModal(r)}
                       style={{
                         fontSize: "12px",
@@ -675,7 +725,7 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDel
   );
 }
 
-function RepoCodeOverview({ repo, onNavigateTab, onOpenGroundingModal }) {
+function RepoCodeOverview({ repo, onNavigateTab, onOpenGroundingModal, onOpenDeepIndexModal }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
@@ -693,6 +743,9 @@ function RepoCodeOverview({ repo, onNavigateTab, onOpenGroundingModal }) {
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn" onClick={() => onOpenDeepIndexModal && onOpenDeepIndexModal(repo)}>
+            ⚡ Deep Index ({repo.chunkCount})
+          </button>
           <button className="btn btn-primary" onClick={() => onNavigateTab("chat")}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
               <path d="M7.998 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM1 8a7 7 0 1 1 14 0A7 7 0 0 1 1 8Z"></path>
@@ -726,7 +779,23 @@ function RepoCodeOverview({ repo, onNavigateTab, onOpenGroundingModal }) {
             <div>
               <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: 4 }}>SEMANTIC CHUNKS</div>
               <div style={{ fontSize: "14px", fontWeight: 600 }}>{repo.chunkCount} code blocks</div>
-              <div style={{ fontSize: "12px", color: "var(--muted)" }}>Vector indexed via pgvector</div>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                {repo.fileCount ? `${repo.fileCount} files indexed • ` : "Vector indexed via pgvector • "}
+                <button
+                  onClick={() => onOpenDeepIndexModal && onOpenDeepIndexModal(repo)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    color: "var(--accent)",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    fontSize: "12px",
+                  }}
+                >
+                  Deep Index ⚡
+                </button>
+              </div>
             </div>
             <div>
               <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: 4 }}>GROUNDING HEALTH</div>
@@ -1139,11 +1208,33 @@ function ChatView({ repo, onRepoUpdated }) {
             {turn.sources?.length > 0 && (
               <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: "0.72rem", color: "var(--muted)", marginRight: 2 }}>Sources cited:</span>
-                {turn.sources.map((s) => (
-                  <span key={s} className="source-chip mono">
-                    {s}
-                  </span>
-                ))}
+                {turn.sources.map((s) => {
+                  const match = s.match(/^(.+?):(\d+)-(\d+)$/);
+                  const file = match ? match[1] : s;
+                  const hash = match ? `#L${match[2]}-L${match[3]}` : "";
+                  const branch = repo.default_branch || "main";
+                  const url = `https://github.com/${repo.owner}/${repo.name}/blob/${branch}/${file}${hash}`;
+                  return (
+                    <a
+                      key={s}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="source-chip mono"
+                      title={`Open ${s} on GitHub`}
+                      style={{
+                        textDecoration: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span>{s}</span>
+                      <span style={{ fontSize: "10px", opacity: 0.7 }}>↗</span>
+                    </a>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1912,11 +2003,33 @@ function StaleIssueRow({ issue, repo, delivery = null, onDelivered = null }) {
               {help.sources?.length > 0 && (
                 <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: "0.72rem", color: "var(--muted)", marginRight: 2 }}>Sources cited:</span>
-                  {help.sources.map((s) => (
-                    <span key={s} className="source-chip mono">
-                      {s}
-                    </span>
-                  ))}
+                  {help.sources.map((s) => {
+                    const match = s.match(/^(.+?):(\d+)-(\d+)$/);
+                    const file = match ? match[1] : s;
+                    const hash = match ? `#L${match[2]}-L${match[3]}` : "";
+                    const branch = repo.default_branch || "main";
+                    const url = `https://github.com/${repo.owner}/${repo.name}/blob/${branch}/${file}${hash}`;
+                    return (
+                      <a
+                        key={s}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="source-chip mono"
+                        title={`Open ${s} on GitHub`}
+                        style={{
+                          textDecoration: "none",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <span>{s}</span>
+                        <span style={{ fontSize: "10px", opacity: 0.7 }}>↗</span>
+                      </a>
+                    );
+                  })}
                 </div>
               )}
 
@@ -2314,7 +2427,7 @@ function AssignmentsView({ repo, currentUser }) {
   );
 }
 
-function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab }) {
+function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab, onOpenDeepIndexModal }) {
   const [currentRepo, setCurrentRepo] = useState(repo);
   const [probing, setProbing] = useState(false);
   const [probeResults, setProbeResults] = useState(null);
@@ -2551,14 +2664,29 @@ function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab }) {
                     If code was refactored or files were deleted on GitHub, vector embeddings drift out of alignment. Re-indexing refreshes all code chunks in pgvector.
                   </p>
                 </div>
-                <button
-                  className="btn"
-                  onClick={runReindex}
-                  disabled={reindexing}
-                  style={{ fontSize: "12px", padding: "6px 14px", flexShrink: 0 }}
-                >
-                  {reindexing ? "Indexing..." : "Re-Index Repository"}
-                </button>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+                  {onOpenDeepIndexModal && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        onClose();
+                        onOpenDeepIndexModal(currentRepo);
+                      }}
+                      style={{ fontSize: "12px", padding: "6px 14px" }}
+                      title="Progressive multi-pass deep indexing for all codebase files"
+                    >
+                      ⚡ Deep Index All Files
+                    </button>
+                  )}
+                  <button
+                    className="btn"
+                    onClick={runReindex}
+                    disabled={reindexing}
+                    style={{ fontSize: "12px", padding: "6px 14px" }}
+                  >
+                    {reindexing ? "Indexing..." : "Re-Index Repository"}
+                  </button>
+                </div>
               </div>
 
               {reindexMsg && (
@@ -2610,6 +2738,488 @@ function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab }) {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", background: "var(--surface-raised)" }}>
+          <button className="btn btn-primary" onClick={onClose} style={{ fontSize: "12px" }}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeepIndexModal({ repo, onClose, onRepoUpdated, onOpenGroundingModal }) {
+  const [currentRepo, setCurrentRepo] = useState(repo);
+  const [indexing, setIndexing] = useState(false);
+  const [isAutoRunning, setIsAutoRunning] = useState(false);
+  const [stats, setStats] = useState({
+    totalChunks: Number(repo.chunkCount) || 0,
+    totalFiles: Number(repo.fileCount) || 0,
+    totalEligibleFiles: null,
+    remainingUnindexedFiles: null,
+    isFullyIndexed: false,
+  });
+  const [logs, setLogs] = useState([]);
+  const [error, setError] = useState(null);
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [cleanReindexing, setCleanReindexing] = useState(false);
+  const stopRef = useRef(false);
+  const passCountRef = useRef(0);
+
+  async function executeBatch() {
+    setIndexing(true);
+    setError(null);
+    setStatusMessage("Fetching repository tree and embedding next batch (~80 files, ~350 chunks)...");
+    try {
+      const res = await fetch("/api/index-repo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          owner: currentRepo.owner,
+          repo: currentRepo.name,
+          append: true,
+          mode: "deep",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Batch indexing failed.");
+        setStatusMessage(null);
+        return null;
+      }
+
+      setStats({
+        totalChunks: data.totalChunks,
+        totalFiles: data.totalFiles,
+        totalEligibleFiles: data.totalEligibleFiles,
+        remainingUnindexedFiles: data.remainingUnindexedFiles,
+        isFullyIndexed: data.isFullyIndexed,
+      });
+
+      setCurrentRepo((prev) => ({
+        ...prev,
+        chunkCount: data.totalChunks,
+        fileCount: data.totalFiles,
+      }));
+
+      const passNum = passCountRef.current + 1;
+      passCountRef.current = passNum;
+
+      const logEntry = {
+        pass: passNum,
+        chunksAdded: data.chunksIndexed,
+        filesAdded: data.filesIndexed,
+        totalChunks: data.totalChunks,
+        totalFiles: data.totalFiles,
+        totalEligible: data.totalEligibleFiles,
+        isFullyIndexed: data.isFullyIndexed,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+
+      setLogs((prev) => [logEntry, ...prev]);
+
+      if (data.isFullyIndexed || data.remainingUnindexedFiles === 0) {
+        setStatusMessage(`All eligible source files indexed! 100% codebase coverage (${data.totalChunks} chunks across ${data.totalFiles} files).`);
+      } else {
+        setStatusMessage(`Pass ${passNum} complete: Added ${data.chunksIndexed} chunks across ${data.filesIndexed} files. ${data.remainingUnindexedFiles} files remaining.`);
+      }
+
+      if (onRepoUpdated) onRepoUpdated();
+      return data;
+    } catch (err) {
+      setError(err.message || "Failed to execute batch index.");
+      setStatusMessage(null);
+      return null;
+    } finally {
+      setIndexing(false);
+    }
+  }
+
+  async function startAutoDeepIndex() {
+    setIsAutoRunning(true);
+    stopRef.current = false;
+    setError(null);
+
+    while (!stopRef.current) {
+      const data = await executeBatch();
+      if (!data) break; // Error occurred, stop loop
+      if (data.isFullyIndexed || data.remainingUnindexedFiles === 0) {
+        break; // Finished completely
+      }
+      if (stopRef.current) break;
+      // Brief breathing room between passes
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    setIsAutoRunning(false);
+  }
+
+  function stopAutoDeepIndex() {
+    stopRef.current = true;
+    setIsAutoRunning(false);
+    setStatusMessage("Auto deep-indexing stopped by user.");
+  }
+
+  async function handleCleanReindex() {
+    const confirm = window.confirm(
+      `Clean Re-Index will wipe existing embeddings for ${currentRepo.owner}/${currentRepo.name} and start fresh from Pass 1. Continue?`
+    );
+    if (!confirm) return;
+
+    setCleanReindexing(true);
+    setError(null);
+    setStatusMessage("Wiping existing vector index and running fresh Pass 1...");
+    try {
+      const res = await fetch("/api/index-repo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          owner: currentRepo.owner,
+          repo: currentRepo.name,
+          append: false, // Fresh index
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Clean re-indexing failed.");
+        setStatusMessage(null);
+        return;
+      }
+
+      passCountRef.current = 1;
+      setStats({
+        totalChunks: data.totalChunks || data.chunksIndexed,
+        totalFiles: data.totalFiles || data.filesIndexed,
+        totalEligibleFiles: data.totalEligibleFiles || null,
+        remainingUnindexedFiles: data.remainingUnindexedFiles ?? null,
+        isFullyIndexed: data.isFullyIndexed || false,
+      });
+
+      setCurrentRepo((prev) => ({
+        ...prev,
+        chunkCount: data.totalChunks || data.chunksIndexed,
+        fileCount: data.totalFiles || data.filesIndexed,
+      }));
+
+      setLogs([
+        {
+          pass: 1,
+          chunksAdded: data.chunksIndexed,
+          filesAdded: data.filesIndexed,
+          totalChunks: data.totalChunks || data.chunksIndexed,
+          totalFiles: data.totalFiles || data.filesIndexed,
+          totalEligible: data.totalEligibleFiles,
+          isFullyIndexed: data.isFullyIndexed,
+          timestamp: new Date().toLocaleTimeString(),
+        },
+      ]);
+
+      setStatusMessage(`Fresh Pass 1 complete: ${data.chunksIndexed} chunks indexed across ${data.filesIndexed} files.`);
+      if (onRepoUpdated) onRepoUpdated();
+    } catch (err) {
+      setError(err.message || "Failed clean re-index.");
+    } finally {
+      setCleanReindexing(false);
+    }
+  }
+
+  const isComplete = stats.isFullyIndexed || (stats.remainingUnindexedFiles === 0 && stats.totalEligibleFiles !== null);
+  const percentComplete = stats.totalEligibleFiles
+    ? Math.min(100, Math.round((stats.totalFiles / stats.totalEligibleFiles) * 100))
+    : stats.totalFiles > 0
+    ? null
+    : 0;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
+        {/* Modal Header */}
+        <div
+          style={{
+            padding: "16px 20px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            background: "var(--surface-raised)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: "20px" }}>⚡</span>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 600 }}>
+                Progressive Deep Index Engine
+              </h3>
+              <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                {currentRepo.owner}/{currentRepo.name} &bull; Multi-Pass Serverless Indexing
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} className="btn" style={{ padding: "4px 8px", fontSize: "12px" }}>
+            ✕
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div style={{ padding: "20px", overflowY: "auto", maxHeight: "calc(90vh - 120px)" }}>
+          {/* Status Gauge & Progress Card */}
+          <div
+            className="card"
+            style={{
+              padding: "16px",
+              marginBottom: 20,
+              background: isComplete ? "rgba(35, 134, 54, 0.08)" : "rgba(56, 139, 253, 0.08)",
+              border: `1px solid ${isComplete ? "rgba(46, 160, 67, 0.35)" : "rgba(56, 139, 253, 0.35)"}`,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+              <div>
+                <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)" }}>
+                  Codebase Coverage
+                </span>
+                <div style={{ fontSize: "20px", fontWeight: 700, color: isComplete ? "var(--success)" : "var(--accent)", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>{stats.totalChunks.toLocaleString()} Indexed Chunks</span>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      padding: "2px 8px",
+                      borderRadius: 12,
+                      background: isComplete ? "rgba(35, 134, 54, 0.2)" : "rgba(56, 139, 253, 0.2)",
+                      border: `1px solid ${isComplete ? "rgba(46, 160, 67, 0.5)" : "rgba(56, 139, 253, 0.5)"}`,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {isComplete ? "✓ 100% Vectorized" : percentComplete !== null ? `${percentComplete}% Covered` : "Micro-Batch Active"}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "13px", fontWeight: 600 }}>
+                  {stats.totalFiles} {stats.totalEligibleFiles ? `/ ${stats.totalEligibleFiles}` : ""} files indexed
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--muted)" }}>
+                  {stats.remainingUnindexedFiles !== null
+                    ? `${stats.remainingUnindexedFiles} files in queue`
+                    : "Queue discovered on first pass"}
+                </div>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div
+              style={{
+                width: "100%",
+                height: 8,
+                background: "rgba(255, 255, 255, 0.1)",
+                borderRadius: 4,
+                overflow: "hidden",
+                position: "relative",
+              }}
+            >
+              <div
+                style={{
+                  width: `${percentComplete !== null ? Math.max(5, percentComplete) : 25}%`,
+                  height: "100%",
+                  background: isComplete ? "var(--success)" : "var(--accent)",
+                  borderRadius: 4,
+                  transition: "width 0.4s ease-in-out",
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Controls Strip */}
+          <div
+            className="card"
+            style={{
+              padding: "16px",
+              marginBottom: 20,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 12,
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: 2 }}>
+                {isAutoRunning
+                  ? "⚡ Auto-Indexing in Progress..."
+                  : indexing
+                  ? "Indexing Current Batch..."
+                  : isComplete
+                  ? "Repository 100% Indexed"
+                  : "Ready for Next Pass"}
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                Each pass safely fetches and embeds ~80 files / ~350 chunks within 20s.
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {isAutoRunning ? (
+                <button
+                  className="btn"
+                  onClick={stopAutoDeepIndex}
+                  style={{
+                    fontSize: "12px",
+                    padding: "6px 14px",
+                    borderColor: "var(--danger)",
+                    color: "var(--danger)",
+                    background: "rgba(248, 81, 73, 0.1)",
+                    fontWeight: 600,
+                  }}
+                >
+                  ⏹ Stop Auto-Index
+                </button>
+              ) : (
+                <>
+                  {!isComplete && (
+                    <button
+                      className="btn"
+                      onClick={() => executeBatch()}
+                      disabled={indexing || cleanReindexing}
+                      style={{ fontSize: "12px", padding: "6px 14px" }}
+                      title="Run a single pass of ~80 files"
+                    >
+                      {indexing ? "Indexing..." : "Index Next Batch"}
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-primary"
+                    onClick={startAutoDeepIndex}
+                    disabled={indexing || cleanReindexing || isComplete}
+                    style={{ fontSize: "12px", padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: 6 }}
+                    title="Automatically execute passes until all files are indexed"
+                  >
+                    <span>⚡</span>
+                    <span>{isComplete ? "Fully Indexed" : "Auto Deep-Index All"}</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Status Message / Error Banner */}
+          {error && (
+            <div
+              className="card"
+              style={{
+                padding: "12px 16px",
+                marginBottom: 16,
+                background: "rgba(248, 81, 73, 0.1)",
+                borderColor: "rgba(248, 81, 73, 0.4)",
+                color: "var(--danger)",
+                fontSize: "12px",
+              }}
+            >
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+
+          {statusMessage && !error && (
+            <div
+              className="card"
+              style={{
+                padding: "10px 14px",
+                marginBottom: 16,
+                background: "var(--surface-raised)",
+                fontSize: "12px",
+                color: "var(--accent)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span>ℹ️</span>
+              <span>{statusMessage}</span>
+            </div>
+          )}
+
+          {/* Live Progress Logs */}
+          {logs.length > 0 && (
+            <div className="card" style={{ padding: "14px 16px", marginBottom: 20 }}>
+              <div style={{ fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", marginBottom: 10 }}>
+                Progressive Indexing Activity
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 180, overflowY: "auto" }}>
+                {logs.map((log, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      fontSize: "12px",
+                      fontFamily: "var(--font-mono)",
+                      padding: "6px 10px",
+                      background: "var(--surface-raised)",
+                      borderRadius: 4,
+                      border: "1px solid var(--border)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ color: "var(--accent)", fontWeight: 700 }}>Pass #{log.pass}</span>
+                      <span>+{log.chunksAdded} chunks ({log.filesAdded} files)</span>
+                      {log.isFullyIndexed && (
+                        <span style={{ color: "var(--success)", fontWeight: 600 }}>[100% COMPLETE]</span>
+                      )}
+                    </div>
+                    <div style={{ color: "var(--muted)", fontSize: "11px" }}>
+                      Total: {log.totalChunks} chunks &bull; {log.timestamp}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Architectural Architecture Explainer */}
+          <div className="card" style={{ padding: "14px 16px", marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: "14px" }}>💡</span>
+              <strong style={{ fontSize: "13px" }}>Why Progressive Deep Index?</strong>
+            </div>
+            <p style={{ margin: 0, fontSize: "12px", color: "var(--muted)", lineHeight: 1.5 }}>
+              Vercel and serverless functions enforce a strict 60-second execution ceiling. Monolithic vector indexing on repositories with hundreds of source files triggers gateway timeouts. Progressive Deep Indexing streams ingestion through deterministic micro-batches of ~350 chunks (~80 files) each, ensuring 100% vector coverage across massive codebases without connection drops. Non-indexed files remain queryable through Just-In-Time (JIT) retrieval.
+            </p>
+          </div>
+
+          {/* Reset / Fresh Indexing */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 8 }}>
+            <button
+              onClick={handleCleanReindex}
+              disabled={indexing || isAutoRunning || cleanReindexing}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                color: "var(--muted)",
+                fontSize: "12px",
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+              title="Wipe existing chunks and re-index from file 1"
+            >
+              {cleanReindexing ? "Wiping & re-indexing..." : "Reset index & start fresh"}
+            </button>
+
+            {onOpenGroundingModal && (
+              <button
+                className="btn"
+                onClick={() => {
+                  onClose();
+                  onOpenGroundingModal(currentRepo);
+                }}
+                style={{ fontSize: "12px", padding: "5px 12px" }}
+              >
+                Inspect Grounding Rate &rarr;
+              </button>
+            )}
           </div>
         </div>
 

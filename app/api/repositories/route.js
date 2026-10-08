@@ -22,12 +22,13 @@ export async function GET(request) {
        r.user_id AS indexed_by_user_id,
        u.github_login AS indexed_by,
        COALESCE(c_stats.chunk_count, 0)::integer AS chunk_count,
+       COALESCE(c_stats.file_count, 0)::integer AS file_count,
        COALESCE(q_stats.total_queries, 0)::integer AS total_queries,
        COALESCE(q_stats.grounded_queries, 0)::integer AS grounded_queries
      FROM repositories r
      LEFT JOIN users u ON u.id = r.user_id
      LEFT JOIN (
-       SELECT repository_id, COUNT(id) AS chunk_count
+       SELECT repository_id, COUNT(id) AS chunk_count, COUNT(DISTINCT file_path) AS file_count
        FROM chunks
        GROUP BY repository_id
      ) c_stats ON c_stats.repository_id = r.id
@@ -59,6 +60,7 @@ export async function GET(request) {
         indexedBy: row.indexed_by,
         indexedByUserId: row.indexed_by_user_id,
         chunkCount: Number(row.chunk_count),
+        fileCount: Number(row.file_count),
         totalQueries: total,
         groundedQueries: grounded,
         groundingRate,
