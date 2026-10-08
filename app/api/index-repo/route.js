@@ -9,8 +9,8 @@ export const maxDuration = 60;
 
 // Caps keep indexing snappy, responsive, and well within serverless execution limits.
 // Non-indexed files remain fully accessible through Just-In-Time (JIT) on-demand retrieval.
-const MAX_FILES = 80;
-const MAX_CHUNKS = 500;
+const MAX_FILES = 45;
+const MAX_CHUNKS = 150;
 const DOWNLOAD_CONCURRENCY = 15;
 const DB_BATCH_SIZE = 25;
 
@@ -100,26 +100,24 @@ function getFilePriority(filePath) {
   return 40;
 }
 
-// Concurrent worker-pool file fetcher
+// Concurrent batched file fetcher
 async function fetchFilesConcurrently(token, owner, repo, files, branch, concurrency = DOWNLOAD_CONCURRENCY) {
-  const results = new Array(files.length);
-  let currentIndex = 0;
-
-  const workers = Array.from({ length: Math.min(concurrency, files.length) }, async () => {
-    while (currentIndex < files.length) {
-      const idx = currentIndex++;
-      const entry = files[idx];
-      try {
-        const content = await getFileContent(token, owner, repo, entry.path, branch);
-        results[idx] = { entry, content };
-      } catch (err) {
-        console.warn(`Failed to fetch file content for ${entry.path}:`, err.message);
-        results[idx] = { entry, content: null };
-      }
-    }
-  });
-
-  await Promise.all(workers);
+  const results = [];
+  for (let i = 0; i < files.length; i += concurrency) {
+    const batch = files.slice(i, i + concurrency);
+    const batchResults = await Promise.all(
+      batch.map(async (entry) => {
+        try {
+          const content = await getFileContent(token, owner, repo, entry.path, branch);
+          return { entry, content };
+        } catch (err) {
+          console.warn(`Failed to fetch file content for ${entry?.path}:`, err.message);
+          return { entry, content: null };
+        }
+      })
+    );
+    results.push(...batchResults);
+  }
   return results;
 }
 
@@ -148,19 +146,18 @@ async function insertChunksBatch(db, repositoryId, chunks, embeddings, batchSize
 }
 
 export async function POST(request) {
-  const user = await getSessionUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-  }
-
-  const { owner, repo } = await request.json();
-  if (!owner || !repo) {
-    return NextResponse.json({ error: "owner and repo are required" }, { status: 400 });
-  }
-
-  const db = getDb();
-
   try {
+    const user = await getSessionUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+    }
+
+    const { owner, repo } = await request.json();
+    if (!owner || !repo) {
+      return NextResponse.json({ error: "owner and repo are required" }, { status: 400 });
+    }
+
+    const db = getDb();
     const repoInfo = await getRepo(user.access_token, owner, repo);
     const branch = repoInfo.default_branch;
 
@@ -229,8 +226,10 @@ export async function POST(request) {
     await db.query(`DELETE FROM chunks WHERE repository_id = $1`, [repositoryId]);
 
     if (allChunks.length > 0) {
-      // Embed chunks with file path context
-      const embeddings = await embedTexts(allChunks.map((c) => `File: ${c.filePath}\n\n${c.text}`));
+      // Embed chunks with file path context (capped at 1000 chars for rapid inference, full text stored in DB)
+      const embeddings = await embedTexts(
+        allChunks.map((c) => `File: ${c.filePath}\n\n${c.text.slice(0, 1000)}`)
+      );
       // Batch insert into Postgres
       await insertChunksBatch(db, repositoryId, allChunks, embeddings, DB_BATCH_SIZE);
     }

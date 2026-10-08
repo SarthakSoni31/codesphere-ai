@@ -938,7 +938,7 @@ function ConnectRepoView({ onIndexed, onCancel }) {
         setStatus("");
         setResult(data);
       } else {
-        setStatus(`Error: ${data.error || "indexing failed"}`);
+        setStatus(`Error: ${data.error || "indexing failed (HTTP " + res.status + ")"}`);
       }
     } catch (err) {
       if (err.name === "AbortError" || err.message?.includes("Load failed") || err.message?.includes("Failed to fetch")) {
