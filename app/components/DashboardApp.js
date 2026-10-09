@@ -148,7 +148,9 @@ export default function DashboardApp() {
                   }}
                   title="Multi-pass progressive Deep Index for large codebases"
                 >
-                  <span style={{ fontSize: "12px" }}>⚡</span>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M9.504.43a1.5 1.5 0 0 1 2.164 1.565l-.643 3.505h2.475a1.5 1.5 0 0 1 1.213 2.385l-7 9.5a1.5 1.5 0 0 1-2.617-1.39l.868-4.495H3.5a1.5 1.5 0 0 1-1.309-2.235l6-9.5A1.5 1.5 0 0 1 9.504.43Z" />
+                  </svg>
                   <span>Deep Index ({selectedRepo.chunkCount || 0})</span>
                 </button>
                 <button
@@ -167,9 +169,15 @@ export default function DashboardApp() {
                   }}
                   title="Grounding health & verification"
                 >
-                  <span style={{ fontSize: "11px" }}>
-                    {selectedRepo.groundingRate !== null && selectedRepo.groundingRate >= 85 ? "✓" : "⚠"}
-                  </span>
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: selectedRepo.groundingRate !== null && selectedRepo.groundingRate >= 85 ? "var(--success)" : "var(--warning)",
+                      display: "inline-block",
+                    }}
+                  />
                   <span>
                     Grounding: {selectedRepo.groundingRate !== null ? `${selectedRepo.groundingRate}%` : "Unverified"}
                   </span>
@@ -293,7 +301,9 @@ export default function DashboardApp() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: "16px" }}>⚠️</span>
+                  <svg width="18" height="18" viewBox="0 0 16 16" fill="var(--warning)" style={{ flexShrink: 0 }}>
+                    <path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" />
+                  </svg>
                   <div>
                     <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--warning)" }}>
                       Grounding Target Alert: {selectedRepo.groundingRate !== null ? `${selectedRepo.groundingRate}%` : "Unverified"} (Required: ≥85.0%)
@@ -598,7 +608,15 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDel
                           }}
                           title="Click to view grounding verification and remediation steps"
                         >
-                          <span>{r.groundingRate >= 85 ? "✓" : "⚠"}</span>
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              background: r.groundingRate >= 85 ? "var(--success)" : "var(--danger)",
+                              display: "inline-block",
+                            }}
+                          />
                           <span>{r.groundingRate}% Grounded {r.groundingRate >= 85 ? "(≥85% Met)" : "(Action Required)"}</span>
                         </button>
                       ) : (
@@ -622,7 +640,15 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDel
                           }}
                           title="Click to run automated grounding health check"
                         >
-                          <span>⚡</span>
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              background: "var(--warning)",
+                              display: "inline-block",
+                            }}
+                          />
                           <span>Unverified (Run Health Check)</span>
                         </button>
                       )}
@@ -638,11 +664,13 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDel
                         padding: "4px 10px",
                         display: "inline-flex",
                         alignItems: "center",
-                        gap: 4,
+                        gap: 5,
                       }}
                       title="Progressively deep-index code files without serverless timeouts"
                     >
-                      <span>⚡</span>
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M9.504.43a1.5 1.5 0 0 1 2.164 1.565l-.643 3.505h2.475a1.5 1.5 0 0 1 1.213 2.385l-7 9.5a1.5 1.5 0 0 1-2.617-1.39l.868-4.495H3.5a1.5 1.5 0 0 1-1.309-2.235l6-9.5A1.5 1.5 0 0 1 9.504.43Z" />
+                      </svg>
                       <span>Deep Index</span>
                     </button>
                     <button
@@ -743,8 +771,15 @@ function RepoCodeOverview({ repo, onNavigateTab, onOpenGroundingModal, onOpenDee
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn" onClick={() => onOpenDeepIndexModal && onOpenDeepIndexModal(repo)}>
-            ⚡ Deep Index ({repo.chunkCount})
+          <button
+            className="btn"
+            onClick={() => onOpenDeepIndexModal && onOpenDeepIndexModal(repo)}
+            style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M9.504.43a1.5 1.5 0 0 1 2.164 1.565l-.643 3.505h2.475a1.5 1.5 0 0 1 1.213 2.385l-7 9.5a1.5 1.5 0 0 1-2.617-1.39l.868-4.495H3.5a1.5 1.5 0 0 1-1.309-2.235l6-9.5A1.5 1.5 0 0 1 9.504.43Z" />
+            </svg>
+            <span>Deep Index ({repo.chunkCount})</span>
           </button>
           <button className="btn btn-primary" onClick={() => onNavigateTab("chat")}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
@@ -793,7 +828,7 @@ function RepoCodeOverview({ repo, onNavigateTab, onOpenGroundingModal, onOpenDee
                     fontSize: "12px",
                   }}
                 >
-                  Deep Index ⚡
+                  Deep Index &rarr;
                 </button>
               </div>
             </div>
@@ -2516,7 +2551,9 @@ function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab, onO
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: "18px" }}>🎯</span>
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="var(--accent)">
+              <path d="m8.533.133 5.25 1.5a.75.75 0 0 1 .542.72v5.397c0 3.784-2.52 6.647-5.992 8.212a.75.75 0 0 1-.666 0C4.195 14.397 1.675 11.534 1.675 7.75V2.353a.75.75 0 0 1 .542-.72l5.25-1.5a.75.75 0 0 1 .416 0l.65.186v-.186ZM3.175 3.018v4.732c0 3.042 1.956 5.412 4.825 6.786 2.869-1.374 4.825-3.744 4.825-6.786V3.018L8 1.646 3.175 3.018Z" />
+            </svg>
             <div>
               <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 600 }}>Grounding Health &amp; Verification</h3>
               <span style={{ fontSize: "12px", color: "var(--muted)" }}>
@@ -2554,9 +2591,21 @@ function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab, onO
                       padding: "2px 8px",
                       borderRadius: 12,
                       background: targetMet ? "rgba(35, 134, 54, 0.2)" : "rgba(210, 153, 34, 0.2)",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
                     }}
                   >
-                    {targetMet ? "✓ Target Met (≥85.0%)" : "⚠ Below 85.0% Target"}
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: targetMet ? "var(--success)" : "var(--warning)",
+                        display: "inline-block",
+                      }}
+                    />
+                    <span>{targetMet ? "Target Met (≥85.0%)" : "Action Required (<85.0%)"}</span>
                   </span>
                 </div>
               </div>
@@ -2672,10 +2721,13 @@ function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab, onO
                         onClose();
                         onOpenDeepIndexModal(currentRepo);
                       }}
-                      style={{ fontSize: "12px", padding: "6px 14px" }}
+                      style={{ fontSize: "12px", padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: 5 }}
                       title="Progressive multi-pass deep indexing for all codebase files"
                     >
-                      ⚡ Deep Index All Files
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M9.504.43a1.5 1.5 0 0 1 2.164 1.565l-.643 3.505h2.475a1.5 1.5 0 0 1 1.213 2.385l-7 9.5a1.5 1.5 0 0 1-2.617-1.39l.868-4.495H3.5a1.5 1.5 0 0 1-1.309-2.235l6-9.5A1.5 1.5 0 0 1 9.504.43Z" />
+                      </svg>
+                      <span>Deep Index All Files</span>
                     </button>
                   )}
                   <button
@@ -2706,9 +2758,9 @@ function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab, onO
                 CodeSphere segments functions at AST boundaries. Ensure critical business logic, routes, and database models use supported languages (`.js`, `.jsx`, `.ts`, `.tsx`, `.py`, `.go`, `.rb`, `.java`). Avoid committing large minified bundles (&gt;500KB) into indexed folders.
               </p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: "11px", color: "var(--muted)" }}>
-                <span style={{ padding: "2px 6px", background: "var(--surface-raised)", borderRadius: 4 }}>✓ AST chunking: active</span>
-                <span style={{ padding: "2px 6px", background: "var(--surface-raised)", borderRadius: 4 }}>✓ 400 file cap</span>
-                <span style={{ padding: "2px 6px", background: "var(--surface-raised)", borderRadius: 4 }}>✓ 2,000 chunk budget</span>
+                <span style={{ padding: "2px 6px", background: "var(--surface-raised)", borderRadius: 4 }}>AST chunking: active</span>
+                <span style={{ padding: "2px 6px", background: "var(--surface-raised)", borderRadius: 4 }}>400 file cap</span>
+                <span style={{ padding: "2px 6px", background: "var(--surface-raised)", borderRadius: 4 }}>2,000 chunk budget</span>
               </div>
             </div>
 
@@ -2948,7 +3000,9 @@ function DeepIndexModal({ repo, onClose, onRepoUpdated, onOpenGroundingModal }) 
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: "20px" }}>⚡</span>
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="var(--accent)">
+              <path d="M9.504.43a1.5 1.5 0 0 1 2.164 1.565l-.643 3.505h2.475a1.5 1.5 0 0 1 1.213 2.385l-7 9.5a1.5 1.5 0 0 1-2.617-1.39l.868-4.495H3.5a1.5 1.5 0 0 1-1.309-2.235l6-9.5A1.5 1.5 0 0 1 9.504.43Z" />
+            </svg>
             <div>
               <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 600 }}>
                 Progressive Deep Index Engine
@@ -2990,9 +3044,21 @@ function DeepIndexModal({ repo, onClose, onRepoUpdated, onOpenGroundingModal }) 
                       background: isComplete ? "rgba(35, 134, 54, 0.2)" : "rgba(56, 139, 253, 0.2)",
                       border: `1px solid ${isComplete ? "rgba(46, 160, 67, 0.5)" : "rgba(56, 139, 253, 0.5)"}`,
                       fontWeight: 600,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
                     }}
                   >
-                    {isComplete ? "✓ 100% Vectorized" : percentComplete !== null ? `${percentComplete}% Covered` : "Micro-Batch Active"}
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: isComplete ? "var(--success)" : "var(--accent)",
+                        display: "inline-block",
+                      }}
+                    />
+                    <span>{isComplete ? "100% Vectorized" : percentComplete !== null ? `${percentComplete}% Covered` : "Micro-Batch Active"}</span>
                   </span>
                 </div>
               </div>
@@ -3048,7 +3114,7 @@ function DeepIndexModal({ repo, onClose, onRepoUpdated, onOpenGroundingModal }) 
             <div>
               <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: 2 }}>
                 {isAutoRunning
-                  ? "⚡ Auto-Indexing in Progress..."
+                  ? "Auto-Indexing in Progress..."
                   : indexing
                   ? "Indexing Current Batch..."
                   : isComplete
@@ -3074,7 +3140,7 @@ function DeepIndexModal({ repo, onClose, onRepoUpdated, onOpenGroundingModal }) 
                     fontWeight: 600,
                   }}
                 >
-                  ⏹ Stop Auto-Index
+                  Stop Auto-Index
                 </button>
               ) : (
                 <>
@@ -3096,7 +3162,9 @@ function DeepIndexModal({ repo, onClose, onRepoUpdated, onOpenGroundingModal }) 
                     style={{ fontSize: "12px", padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: 6 }}
                     title="Automatically execute passes until all files are indexed"
                   >
-                    <span>⚡</span>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M9.504.43a1.5 1.5 0 0 1 2.164 1.565l-.643 3.505h2.475a1.5 1.5 0 0 1 1.213 2.385l-7 9.5a1.5 1.5 0 0 1-2.617-1.39l.868-4.495H3.5a1.5 1.5 0 0 1-1.309-2.235l6-9.5A1.5 1.5 0 0 1 9.504.43Z" />
+                    </svg>
                     <span>{isComplete ? "Fully Indexed" : "Auto Deep-Index All"}</span>
                   </button>
                 </>
@@ -3135,7 +3203,9 @@ function DeepIndexModal({ repo, onClose, onRepoUpdated, onOpenGroundingModal }) 
                 gap: 8,
               }}
             >
-              <span>ℹ️</span>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ flexShrink: 0 }}>
+                <path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1 0-1.5h.25v-2h-.5a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
+              </svg>
               <span>{statusMessage}</span>
             </div>
           )}
@@ -3181,7 +3251,9 @@ function DeepIndexModal({ repo, onClose, onRepoUpdated, onOpenGroundingModal }) 
           {/* Architectural Architecture Explainer */}
           <div className="card" style={{ padding: "14px 16px", marginBottom: 20 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: "14px" }}>💡</span>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="var(--accent)" style={{ flexShrink: 0 }}>
+                <path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1 0-1.5h.25v-2h-.5a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
+              </svg>
               <strong style={{ fontSize: "13px" }}>Why Progressive Deep Index?</strong>
             </div>
             <p style={{ margin: 0, fontSize: "12px", color: "var(--muted)", lineHeight: 1.5 }}>
