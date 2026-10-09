@@ -2468,9 +2468,32 @@ function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab, onO
   const [probeResults, setProbeResults] = useState(null);
   const [probeSummary, setProbeSummary] = useState(null);
   const [probeError, setProbeError] = useState(null);
+  const [reportCopied, setReportCopied] = useState(false);
 
   const [reindexing, setReindexing] = useState(false);
   const [reindexMsg, setReindexMsg] = useState(null);
+
+  function copyReport() {
+    if (!probeSummary || !probeResults) return;
+    const lines = [
+      `# CodeSphere Grounding Health Audit Report`,
+      `- **Repository**: ${currentRepo.owner}/${currentRepo.name}`,
+      `- **Date**: ${new Date().toISOString()}`,
+      `- **Overall Grounding Reliability**: ${probeSummary.overall}% (${probeSummary.targetMet ? "PASSED (≥85.0% Standard)" : "ACTION REQUIRED (<85.0%)"})`,
+      `- **Probe Score**: ${probeSummary.passed}/${probeSummary.total} queries passed (${probeSummary.rate}%)`,
+      ``,
+      `## Automated In-Code Probe Benchmark`,
+      ...probeResults.map(
+        (pr) => `- [${pr.passed ? "PASS" : "FAIL"}] ${pr.filePath} (symbol: ${pr.symbol}) -> Cited: ${pr.sources.join(", ") || "No source found"}`
+      ),
+      ``,
+      `---`,
+      `Verified via CodeSphere AI • Local ONNX pgvector Retrieval • Zero-Hallucination Guard`,
+    ];
+    navigator.clipboard.writeText(lines.join("\n"));
+    setReportCopied(true);
+    setTimeout(() => setReportCopied(false), 2000);
+  }
 
   const rate = currentRepo.groundingRate;
   const targetMet = rate !== null && rate >= 85.0;
@@ -2679,8 +2702,18 @@ function GroundingHealthModal({ repo, onClose, onRepoUpdated, onNavigateTab, onO
 
               {probeSummary && (
                 <div style={{ marginTop: 12, padding: "10px 12px", background: "var(--surface-raised)", borderRadius: 6, fontSize: "12px" }}>
-                  <div style={{ fontWeight: 600, color: probeSummary.targetMet ? "var(--success)" : "var(--warning)", marginBottom: 6 }}>
-                    Probe Results: {probeSummary.passed}/{probeSummary.total} Passed ({probeSummary.rate}%) &bull; Overall Repo Grounding: {probeSummary.overall}%
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
+                    <div style={{ fontWeight: 600, color: probeSummary.targetMet ? "var(--success)" : "var(--warning)" }}>
+                      Probe Results: {probeSummary.passed}/{probeSummary.total} Passed ({probeSummary.rate}%) &bull; Overall Repo Grounding: {probeSummary.overall}%
+                    </div>
+                    <button
+                      className="btn"
+                      onClick={copyReport}
+                      style={{ fontSize: "11px", padding: "2px 8px" }}
+                      title="Copy markdown audit report to clipboard"
+                    >
+                      {reportCopied ? "Copied" : "Copy Report"}
+                    </button>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {probeResults.map((pr, idx) => (
