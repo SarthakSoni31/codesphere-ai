@@ -436,6 +436,10 @@ code, .mono {
   margin-left: auto;
 }
 
+.gh-menu-item:hover {
+  background: var(--surface-raised);
+}
+
 .brand-logo-svg {
   color: var(--text);
   flex-shrink: 0;

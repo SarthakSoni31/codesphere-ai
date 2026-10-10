@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import SignOutButton from "./components/SignOutButton";
 import NotificationBell from "./components/NotificationBell";
+import HeaderSearch from "./components/HeaderSearch";
 import "./globals.css";
 
 export const metadata = {
@@ -28,12 +29,7 @@ export default function RootLayout({ children }) {
               </span>
             </a>
 
-            <div className="gh-header-search">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ opacity: 0.6 }}>
-                <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"></path>
-              </svg>
-              <span>Type <kbd className="gh-kbd">/</kbd> to search</span>
-            </div>
+            <HeaderSearch />
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

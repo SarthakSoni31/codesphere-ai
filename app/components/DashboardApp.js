@@ -45,6 +45,51 @@ export default function DashboardApp() {
     setShowConnectForm(false);
   }
 
+  // Handle global header search selections and actions
+  useEffect(() => {
+    function handleOpenRepo(e) {
+      const { repoId, repo, view: reqView = "chat" } = e.detail || {};
+      if (repo) {
+        selectRepo(repo, reqView);
+      } else if (repoId) {
+        const found = teamRepos.find(
+          (r) => r.id === repoId || `${r.owner}/${r.name}`.toLowerCase() === String(repoId).toLowerCase()
+        );
+        if (found) selectRepo(found, reqView);
+      }
+    }
+
+    function handleAction(e) {
+      const { action } = e.detail || {};
+      if (action === "connect") {
+        setSelectedRepo(null);
+        setShowConnectForm(true);
+      }
+    }
+
+    window.addEventListener("codesphere:open-repo", handleOpenRepo);
+    window.addEventListener("codesphere:action", handleAction);
+    return () => {
+      window.removeEventListener("codesphere:open-repo", handleOpenRepo);
+      window.removeEventListener("codesphere:action", handleAction);
+    };
+  }, [teamRepos]);
+
+  // Read ?repo= and ?view= on initial URL load
+  useEffect(() => {
+    if (typeof window !== "undefined" && teamRepos.length > 0 && !selectedRepo) {
+      const params = new URLSearchParams(window.location.search);
+      const repoParam = params.get("repo");
+      const viewParam = params.get("view");
+      if (repoParam) {
+        const found = teamRepos.find(
+          (r) => r.id === repoParam || `${r.owner}/${r.name}`.toLowerCase() === repoParam.toLowerCase()
+        );
+        if (found) selectRepo(found, viewParam || "chat");
+      }
+    }
+  }, [teamRepos, selectedRepo]);
+
   async function deleteRepo(repo) {
     const confirmed = window.confirm(
       `Delete ${repo.owner}/${repo.name}? This removes all its indexed chunks, discussion, and assignments for the whole team. This can't be undone.`
@@ -527,32 +572,67 @@ function HomeView({ currentUser, teamRepos = [], onOpenRepo, onConnectNew, onDel
       {activeTab === "repos" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12 }}>
-            <input
-              type="text"
-              className="gh-filter-input"
-              placeholder="Filter repositories by name or owner..."
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              style={{ maxWidth: 360 }}
-            />
+            <div style={{ position: "relative", maxWidth: 360, width: "100%" }}>
+              <input
+                type="text"
+                className="gh-filter-input"
+                placeholder="Filter repositories by name or owner..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                style={{ width: "100%", paddingRight: searchFilter ? 28 : 10 }}
+              />
+              {searchFilter && (
+                <button
+                  onClick={() => setSearchFilter("")}
+                  style={{
+                    position: "absolute",
+                    right: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "transparent",
+                    border: "none",
+                    color: "var(--muted)",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                  title="Clear filter"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
             <span style={{ fontSize: "12px", color: "var(--muted)" }}>
               Showing {filteredRepos.length} connected repos
             </span>
           </div>
 
           {filteredRepos.length === 0 ? (
-            <div className="card" style={{ padding: "40px 20px", textAlign: "center" }}>
-              <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" style={{ color: "var(--muted)", marginBottom: 12 }}>
-                <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25H12v1.5H5.25a.25.25 0 0 1-.25-.25Z"></path>
-              </svg>
-              <h4 style={{ margin: "0 0 6px", fontSize: "15px" }}>No repositories connected yet</h4>
-              <p style={{ color: "var(--muted)", fontSize: "13px", maxWidth: 440, margin: "0 auto 16px" }}>
-                Connect a GitHub repository to index its source files, chat with the codebase, and automate issue triage.
-              </p>
-              <button className="btn btn-primary" onClick={onConnectNew}>
-                Connect repository &rarr;
-              </button>
-            </div>
+            teamRepos.length > 0 ? (
+              <div className="card" style={{ padding: "40px 20px", textAlign: "center" }}>
+                <h4 style={{ margin: "0 0 6px", fontSize: "15px" }}>No repositories matching &ldquo;{searchFilter}&rdquo;</h4>
+                <p style={{ color: "var(--muted)", fontSize: "13px", maxWidth: 440, margin: "0 auto 16px" }}>
+                  Try checking for typos or clear your search filter to see all connected repositories.
+                </p>
+                <button className="btn" onClick={() => setSearchFilter("")}>
+                  Clear search filter
+                </button>
+              </div>
+            ) : (
+              <div className="card" style={{ padding: "40px 20px", textAlign: "center" }}>
+                <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" style={{ color: "var(--muted)", marginBottom: 12 }}>
+                  <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25H12v1.5H5.25a.25.25 0 0 1-.25-.25Z"></path>
+                </svg>
+                <h4 style={{ margin: "0 0 6px", fontSize: "15px" }}>No repositories connected yet</h4>
+                <p style={{ color: "var(--muted)", fontSize: "13px", maxWidth: 440, margin: "0 auto 16px" }}>
+                  Connect a GitHub repository to index its source files, chat with the codebase, and automate issue triage.
+                </p>
+                <button className="btn btn-primary" onClick={onConnectNew}>
+                  Connect repository &rarr;
+                </button>
+              </div>
+            )
           ) : (
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
               {filteredRepos.map((r, i) => (

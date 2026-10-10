@@ -35,6 +35,28 @@ export async function POST(request) {
 
   const repo = repoRows[0];
 
+  // Fetch repository stats and sample indexed paths to give Copilot full awareness of the codebase
+  let repoContext = null;
+  try {
+    const { rows: statsRows } = await db.query(
+      `SELECT COUNT(DISTINCT file_path) as file_count, COUNT(*) as chunk_count FROM chunks WHERE repository_id = $1`,
+      [repositoryId]
+    );
+    const { rows: pathRows } = await db.query(
+      `SELECT DISTINCT file_path FROM chunks WHERE repository_id = $1 ORDER BY file_path ASC LIMIT 40`,
+      [repositoryId]
+    );
+    repoContext = {
+      owner: repo.owner,
+      name: repo.name,
+      totalChunks: Number(statsRows[0]?.chunk_count) || 0,
+      totalFiles: Number(statsRows[0]?.file_count) || 0,
+      samplePaths: pathRows.map((r) => r.file_path),
+    };
+  } catch (err) {
+    console.warn("Could not fetch repo stats for chat:", err.message);
+  }
+
   try {
     const chunks = await findRelevantChunks(db, {
       repositoryId,
@@ -50,7 +72,7 @@ export async function POST(request) {
       },
     });
 
-    const { answer, sources } = await generateGroundedAnswer(question, chunks);
+    const { answer, sources } = await generateGroundedAnswer(question, chunks, repoContext);
 
     // Persist so this survives a refresh / repo switch. Best-effort and
     // isolated in its own try/catch — a DB hiccup here shouldn't take down
